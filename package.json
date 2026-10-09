@@ -1,0 +1,22 @@
+{
+  "name": "jira-flow",
+  "version": "0.1.0",
+  "description": "Workflow templates for Jira Cloud team-managed projects and issues kept in step with the host's items",
+  "private": true,
+  "type": "module",
+  "main": "index.mjs",
+  "exports": {
+    ".": "./index.mjs",
+    "./contract/*": "./contract/*"
+  },
+  "bin": {
+    "jira-flow": "main.mjs"
+  },
+  "files": ["index.mjs", "main.mjs", "module.json", "src", "contract", "locales", "templates", "README.md"],
+  "scripts": {
+    "test": "node tests/run-all.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

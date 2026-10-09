@@ -1,0 +1,54 @@
+{
+  "id": "design-dev",
+  "version": 1,
+  "statuses": [
+    { "name": "Backlog", "category": "new", "phase": null },
+    { "name": "Design", "category": "indeterminate", "phase": "design" },
+    { "name": "Design Review", "category": "indeterminate", "phase": "design" },
+    { "name": "Design Approved", "category": "indeterminate", "phase": "design" },
+    { "name": "To Do", "category": "new", "phase": "dev" },
+    { "name": "To Do (Approved)", "category": "new", "phase": "dev" },
+    { "name": "In Progress", "category": "indeterminate", "phase": "dev" },
+    { "name": "AI Testing", "category": "indeterminate", "phase": "dev" },
+    { "name": "Human Testing", "category": "indeterminate", "phase": "dev" },
+    { "name": "Done", "category": "done", "phase": "dev" }
+  ],
+  "initial": "To Do",
+  "transitions": [
+    { "from": "*", "to": "Backlog" },
+    { "from": "Backlog", "to": "Design" },
+    { "from": "Backlog", "to": "To Do" },
+    { "from": "To Do", "to": "Design" },
+    { "from": "Design", "to": "Design Review" },
+    { "from": "Design Review", "to": "Design" },
+    { "from": "Design Review", "to": "Design Approved" },
+    { "from": "Design Approved", "to": "Design" },
+    { "from": "Design Approved", "to": "To Do" },
+    { "from": "To Do", "to": "To Do (Approved)" },
+    { "from": "To Do (Approved)", "to": "In Progress" },
+    { "from": "To Do (Approved)", "to": "To Do" },
+    { "from": "In Progress", "to": "AI Testing" },
+    { "from": "In Progress", "to": "Human Testing" },
+    { "from": "In Progress", "to": "To Do" },
+    { "from": "AI Testing", "to": "Human Testing" },
+    { "from": "AI Testing", "to": "In Progress" },
+    { "from": "AI Testing", "to": "To Do" },
+    { "from": "Human Testing", "to": "Done" },
+    { "from": "Human Testing", "to": "AI Testing" },
+    { "from": "Human Testing", "to": "In Progress" },
+    { "from": "Human Testing", "to": "To Do" },
+    { "from": "Done", "to": "To Do" }
+  ],
+  "columns": ["Backlog", "Design", "Design Review", "Design Approved", "To Do", "To Do (Approved)", "In Progress", "AI Testing", "Human Testing", "Done"],
+  "types": [
+    { "name": "Task", "required": true },
+    { "name": "Bug", "required": false },
+    { "name": "Story", "required": false }
+  ],
+  "roles": [
+    { "key": "design", "statuses": ["Design", "Design Review", "Design Approved"], "gate": ["Design Approved"] },
+    { "key": "lead", "statuses": ["To Do"], "gate": ["To Do (Approved)"] },
+    { "key": "dev", "statuses": ["To Do (Approved)", "In Progress", "AI Testing"], "gate": [] },
+    { "key": "qa", "statuses": ["Human Testing"], "gate": ["Done"] }
+  ]
+}
