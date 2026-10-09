@@ -59,6 +59,15 @@ await check('check: missing design statuses, categories, transitions, initial st
   assert.equal(describe(c, 'en').items.find((i) => i.key === 'statuses').title, 'Statuses')
 })
 
+await check('issues in the project: information while it follows the template, a limit while something is to fix', () => {
+  const fit = { ...P, issues: 2, statuses: T.statuses.map(({ name, category }) => ({ name, category })), transitions: T.transitions, initial: T.initial, board: { name: 'B', columns: T.columns } }
+  const ok = checkProject(fit, T).items.find((i) => i.key === 'issues')
+  assert.deepEqual([ok.state, ok.code], ['ok', 'check.issues.follow'])
+  const limits = checkProject({ ...P, issues: 2 }, T).items.find((i) => i.key === 'issues')
+  assert.deepEqual([limits.state, limits.code], ['warn', 'check.issues.limits'])
+  assert.equal(checkProject(P, T).items.find((i) => i.key === 'issues').state, 'ok')
+})
+
 await check('update: new statuses get UUIDs, categories fixed, transitions and initial status follow the template', () => {
   const { payload, summary } = buildUpdate(raw(), T)
   assert.deepEqual(summary.created, ['Design', 'Design Review', 'Design Approved'])

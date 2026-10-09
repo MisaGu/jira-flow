@@ -70,7 +70,11 @@ export function checkProject(p, tpl) {
   else if (lackT.length) add(I.TYPES, S.WARN, 'check.types.optional', { names: lackT.map((t) => t.name) })
   else add(I.TYPES, S.OK, 'check.types.ok', { names: tpl.types.map((t) => t.name) })
 
-  add(I.ISSUES, p.issues ? S.WARN : S.OK, p.issues ? 'check.issues.some' : 'check.issues.none', { count: p.issues || 0 })
+  // Issues in the project are information while the project follows the template; with something to fix they limit
+  // what can go in (applyTemplate: only what moves no issue).
+  const open = items.some((i) => i.state === S.BAD || (i.state === S.WARN && i.key !== I.TYPES))
+  if (!p.issues) add(I.ISSUES, S.OK, 'check.issues.none', { count: 0 })
+  else add(I.ISSUES, open ? S.WARN : S.OK, open ? 'check.issues.limits' : 'check.issues.follow', { count: p.issues })
   return withCounts({ project: p.key, template: { id: tpl.id, version: tpl.version }, items })
 }
 

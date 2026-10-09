@@ -16,8 +16,15 @@
       "TASK_FAILED": "Jira did not finish the change",
       "COLUMNS": "Board columns could not be changed"
     },
-    "category": { "new": "To do", "indeterminate": "In progress", "done": "Done" },
-    "phase": { "design": "Design", "dev": "Development" },
+    "category": {
+      "new": "To do",
+      "indeterminate": "In progress",
+      "done": "Done"
+    },
+    "phase": {
+      "design": "Design",
+      "dev": "Development"
+    },
     "item": {
       "kind": "Project kind",
       "statuses": "Statuses",
@@ -29,10 +36,30 @@
       "issues": "Issues in the project",
       "rules": "Transition rules"
     },
-    "state": { "ok": "matches", "warn": "to fix", "bad": "missing", "unknown": "not checked" },
-    "via": { "api": "the module applies it", "manual": "only by hand in Jira", "check": "needs a Jira login" },
-    "role": { "design": "Design", "lead": "Approval", "dev": "Development", "qa": "Check" },
-    "event": { "created": "created", "moved": "moved", "commented": "commented", "text": "text updated", "error": "error" }
+    "state": {
+      "ok": "matches",
+      "warn": "to fix",
+      "bad": "missing",
+      "unknown": "not checked"
+    },
+    "via": {
+      "api": "the module applies it",
+      "manual": "only by hand in Jira",
+      "check": "needs a Jira login"
+    },
+    "role": {
+      "design": "Design",
+      "lead": "Approval",
+      "dev": "Development",
+      "qa": "Check"
+    },
+    "event": {
+      "created": "created",
+      "moved": "moved",
+      "commented": "commented",
+      "text": "text updated",
+      "error": "error"
+    }
   },
   "text": {
     "check.kind.software": "Jira Software, {{managed}}-managed.",
@@ -58,8 +85,9 @@
     "check.types.required": "Required type missing: {{names}}.",
     "check.types.optional": "Missing: {{names}} (optional).",
     "check.types.ok": "{{names}} exist.",
-    "check.issues.some": "{{count}}: a workflow change moves their statuses.",
     "check.issues.none": "Empty: the template goes in without moving issues.",
+    "check.issues.follow": "Issues: {{count}}, already following the template.",
+    "check.issues.limits": "Issues: {{count}}. Transitions and role rules can still be applied; new statuses, categories and columns need an empty project.",
     "check.rules.ok": "Who gets an issue in each status and who may move it follow the roles.",
     "check.rules.differ": "Assignees and gates do not follow the roles: {{count}} transitions.",
     "fix.statuses.check": "check the statuses against the template",

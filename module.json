@@ -1,6 +1,6 @@
 {
   "name": "jira-flow",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "contract": 1,
   "what": "Workflow templates for Jira Cloud team-managed projects (check, plan, apply in one go, roles, new project) and keeping issues in step with the host's items.",
   "entry": "main.mjs",
