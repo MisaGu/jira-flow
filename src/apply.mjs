@@ -1,7 +1,8 @@
 // The whole cycle on a project: inspect (check, plan, what applying would do, columns, people, roles), apply the
 // template (board columns first — each brings its status — then statuses, transitions and role rules of the
-// workflow, then the column order) and create a new project from the template. Only an empty team-managed Jira
-// Software project takes a template: in a project with issues, changing the workflow moves them.
+// workflow, then the column order) and create a new project from the template. Only a team-managed Jira Software
+// project takes a template. In a project with issues only what moves no issue goes in: transitions, role rules, the
+// initial status and the column order; new statuses, other categories and new columns need an empty project.
 import { arrangeColumns, boardOps, planColumns, readColumns, wantedOrder } from './board.mjs'
 import { checkProject, planFor, rulesItem, withCounts } from './check.mjs'
 import { fail } from './errors.mjs'
@@ -25,6 +26,12 @@ async function columnsPlan(jira, live, tpl) {
 
 const ready = (p) => p.kind === 'software' && p.managed === 'team'
 
+// Why the template cannot go into this project now: issues there and a change that touches statuses; null — it can.
+export function blockedFor(project, summary, columns) {
+  const touches = summary.created.length || summary.changed.length || columns?.create?.length
+  return project.issues && touches ? { code: 'NOT_EMPTY', vars: { count: project.issues } } : null
+}
+
 // roles — the host's saved roles ({ <role>: { people, assign } }); missing people fall back to the login.
 export async function inspect(jira, key, { template, roles: saved = {} }) {
   const live = await readProject(jira, key)
@@ -38,7 +45,8 @@ export async function inspect(jira, key, { template, roles: saved = {} }) {
     roles = rolesFor(people, saved, template)
     const summary = buildUpdate(live.raw, template, rulesFor(roles, template, people.me.accountId)).summary
     check.items.push(rulesItem(summary.rulesChanged))
-    apply = { ...summary, columns: await columnsPlan(jira, live, template), blocked: p.issues ? { code: 'NOT_EMPTY', vars: { count: p.issues } } : null }
+    const columns = await columnsPlan(jira, live, template)
+    apply = { ...summary, columns, blocked: blockedFor(p, summary, columns) }
   }
   const counted = withCounts(check)
   return { ...counted, plan: planFor(p, counted, { live: true }), apply, people, roles, project: p }
@@ -47,11 +55,11 @@ export async function inspect(jira, key, { template, roles: saved = {} }) {
 export async function applyTemplate(jira, key, { template, roles: saved = {}, dryRun = false, lang = 'en' }) {
   const live = await readProject(jira, key)
   if (!ready(live.project)) fail('NOT_TEAM_MANAGED', `${key} is not a team-managed Jira Software project`)
-  if (live.project.issues) fail('NOT_EMPTY', `${key} has ${live.project.issues} issues; a template goes only into an empty project`, { count: live.project.issues })
   const people = await readPeople(jira, key)
   const roles = rolesFor(people, saved, template)
   const rules = rulesFor(roles, template, people.me.accountId)
   const board = await columnsPlan(jira, live, template)
+  if (blockedFor(live.project, buildUpdate(live.raw, template, rules).summary, board)) fail('NOT_EMPTY', `${key} has ${live.project.issues} issues; new statuses, categories and columns go only into an empty project`, { count: live.project.issues })
   const cols = { create: board?.create || [], manual: board?.manual || [], ordered: board?.ordered ?? null, error: board?.error || null, created: [] }
   const base = { people, roles }
   if (dryRun) {

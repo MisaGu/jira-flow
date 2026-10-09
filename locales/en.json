@@ -74,7 +74,7 @@
     "fix.board.order": "put the columns in flow order",
     "fix.types": "add issue type {{names}}",
     "fix.rules": "set transition rules: assignees by role, gates for roles",
-    "blocked.NOT_EMPTY": "{{count}} issues in the project: a template goes only into an empty project",
+    "blocked.NOT_EMPTY": "{{count}} issues in the project: new statuses, categories and columns go only into an empty project",
     "template.design-dev.title": "Design → development",
     "template.design-dev.about": "Design goes first: versions are made and reviewed, the main one is chosen. The approved design becomes a development issue and goes through implementation and testing. It is the same issue from the first request to the check of the result.",
     "template.design-dev.status.Backlog": "set aside, not in work",

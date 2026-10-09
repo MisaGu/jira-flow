@@ -7,9 +7,10 @@ Workflow templates for Jira Cloud team-managed projects, and issues kept in step
   Approved) and then development (To Do → To Do (Approved) → In Progress → AI Testing → Human Testing → Done; Done only
   after Human Testing).
 - **Check, plan, apply.** `inspect` compares a project with the template item by item and says how each item can be
-  fixed. `applyTemplate` brings an empty team-managed Jira Software project in line in one go: missing board columns,
+  fixed. `applyTemplate` brings a team-managed Jira Software project in line in one go: missing board columns,
   then statuses, transitions and role rules through the workflow API, then the column order. A dry run lets Jira
-  validate without writing.
+  validate without writing. In a project with issues only what moves no issue goes in (transitions, role rules, the
+  initial status, the column order); new statuses, other categories and new columns need an empty project.
 - **Roles.** Who leads an issue in which statuses and who may move it into a gate status become Jira transition rules:
   an assignee on entering a status, a restriction on entering a gate. One person in Jira holds every role.
 - **New project.** `createFromTemplate` creates an empty team-managed project and applies the template (Jira admins
@@ -78,7 +79,7 @@ retry }`.
 
 - **The module:** the token goes only into the Authorization header — not into results, errors or events; nothing is
   read from or written to disk; Jira is written only by `applyTemplate` (not in a dry run), `createFromTemplate`,
-  `createProject` and the sync engine; a template goes only into an empty team-managed project.
+  `createProject` and the sync engine; new statuses, categories and columns go only into an empty project.
 - **Jira:** validates every workflow update before it is applied; transition rules apply to people moving issues by
   hand as well.
 - **The host:** keeps the token and the saved roles, decides which items to sync and when, keeps the links (the store),

@@ -1,6 +1,6 @@
 // Template, project check, plan, workflow update, roles and rules, board columns — pure functions, no Jira.
 import { assert, check, done } from './harness.mjs'
-import { arrangeColumns, buildUpdate, checkProject, describe, describeTemplate, loadTemplate, planColumns, planFor, rolesFor, rulesFor, validateTemplate, wantedOrder } from '../index.mjs'
+import { arrangeColumns, blockedFor, buildUpdate, checkProject, describe, describeTemplate, loadTemplate, planColumns, planFor, rolesFor, rulesFor, validateTemplate, wantedOrder } from '../index.mjs'
 
 const T = loadTemplate('design-dev')
 const CYR = /\p{Script=Cyrillic}/u
@@ -92,6 +92,16 @@ await check('update again on an updated project — nothing new', () => {
 })
 
 const R = (people, assign = people[0]) => ({ people, assign })
+
+await check('project with issues: rules, transitions and order go in; new statuses, categories or columns do not', () => {
+  const s = buildUpdate(raw(), T).summary
+  assert.equal(blockedFor({ issues: 0 }, s, { create: ['Design'] }), null)
+  assert.deepEqual(blockedFor({ issues: 3 }, s, { create: [] }), { code: 'NOT_EMPTY', vars: { count: 3 } })
+  const same = buildUpdate(after(buildUpdate(raw(), T).payload), T, rulesFor({ design: R(['d1']), lead: R(['l1']), dev: R(['v1']), qa: R(['q1']) }, T, 'svc')).summary
+  assert.ok(same.rulesChanged > 0)
+  assert.equal(blockedFor({ issues: 3 }, same, { create: [] }), null)
+  assert.ok(blockedFor({ issues: 3 }, same, { create: ['Design'] }))
+})
 
 await check('roles: one person in Jira holds every role; saved roles keep only people of the project', () => {
   const alone = { me: { accountId: 'admin', name: 'Admin' }, users: [{ accountId: 'admin', name: 'Admin' }] }

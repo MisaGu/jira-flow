@@ -1,7 +1,7 @@
 // jira-flow for code: everything named in module.json → api, nothing else.
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { applyTemplate, createFromTemplate, inspect } from './src/apply.mjs'
+import { applyTemplate, blockedFor, createFromTemplate, inspect } from './src/apply.mjs'
 import { arrangeColumns, boardOps, planColumns, readColumns, wantedOrder } from './src/board.mjs'
 import { checkProject, describe, planFor, rulesItem } from './src/check.mjs'
 import { boardUrl, createClient, issueUrl, siteCloudId, SITE_RE } from './src/client.mjs'
@@ -25,6 +25,7 @@ export {
   addComment,
   applyTemplate,
   arrangeColumns,
+  blockedFor,
   boardOps,
   boardUrl,
   buildUpdate,

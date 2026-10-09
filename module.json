@@ -1,13 +1,13 @@
 {
   "name": "jira-flow",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "contract": 1,
   "what": "Workflow templates for Jira Cloud team-managed projects (check, plan, apply in one go, roles, new project) and keeping issues in step with the host's items.",
   "entry": "main.mjs",
   "env": "JIRA_FLOW",
   "model": false,
   "api": [
-    "addComment", "applyTemplate", "arrangeColumns", "boardOps", "boardUrl", "buildUpdate", "checkLang", "checkProject", "CONTRACT",
+    "addComment", "applyTemplate", "arrangeColumns", "blockedFor", "boardOps", "boardUrl", "buildUpdate", "checkLang", "checkProject", "CONTRACT",
     "createClient", "createFromTemplate", "createIssue", "createProject", "createSync", "describe", "describeTemplate", "enums",
     "findByLabel", "FlowError", "inspect", "isAdmin", "issueUrl", "KEY_RE", "labels", "listProjects", "loadTemplate", "markdownToAdf",
     "moveTo", "pathTo", "planColumns", "planFor", "readColumns", "readPeople", "readProject", "retryable", "roleOf", "rolesFor",
