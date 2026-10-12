@@ -1,0 +1,209 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jira-flow/events",
+  "title": "Events of the service",
+  "description": "The stream GET api/events (Server-Sent Events) and emit(event, data) of the engine. Event jira — what the sync did for one item.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event",
+    "data"
+  ],
+  "properties": {
+    "event": {
+      "const": "jira"
+    },
+    "data": {
+      "$ref": "#/$defs/jira"
+    }
+  },
+  "$defs": {
+    "jira": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "key",
+            "found"
+          ],
+          "properties": {
+            "type": {
+              "const": "created"
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "found": {
+              "type": "boolean",
+              "description": "its own issue was found by label: created before, the link was lost"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "key",
+            "from",
+            "to",
+            "path"
+          ],
+          "properties": {
+            "type": {
+              "const": "moved"
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "from": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 60
+            },
+            "to": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "path": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "maxLength": 60
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "key",
+            "note"
+          ],
+          "properties": {
+            "type": {
+              "const": "commented"
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "note": {
+              "type": "string",
+              "maxLength": 200
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "key",
+            "parent"
+          ],
+          "properties": {
+            "type": {
+              "const": "parent"
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "parent": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "key"
+          ],
+          "properties": {
+            "type": {
+              "const": "text"
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "key": {
+              "type": "string",
+              "maxLength": 40
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "id",
+            "code",
+            "message",
+            "retry"
+          ],
+          "properties": {
+            "type": {
+              "const": "error"
+            },
+            "id": {
+              "type": "string",
+              "maxLength": 500,
+              "minLength": 1
+            },
+            "code": {
+              "type": "string",
+              "maxLength": 40
+            },
+            "message": {
+              "type": "string",
+              "maxLength": 8000
+            },
+            "retry": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,6 +1,6 @@
 // The module's own rules: English outside locales and fixtures (rule K1), every enum value labelled in English and in
-// every other locale (K5), lang checked (K2), no word of a caller anywhere (A1), api = what module.json names,
-// one version in module.json and package.json, every .mjs starts with a comment.
+// every other locale (K5), lang checked (K2), no word of a caller anywhere (A1), the exports are exactly the public
+// interface of the README, one version, every .mjs starts with a comment.
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -54,11 +54,12 @@ await check('K2: lang — a BCP 47 code, en by default; labels of a language wit
   assert.equal(api.textOf('check.statuses.missing', 'en', { names: ['A', 'B'] }), 'Missing: A, B.')
 })
 
-await check('api: exports are exactly module.json api; one version; every .mjs starts with a comment', () => {
-  const passport = JSON.parse(text(path.join(ROOT, 'module.json')))
+// The public interface: the service (engine, host, server, contract) and what a host shows. The Jira work is inside.
+const EXPORTS = ['boardUrl', 'checkLang', 'CONTRACT', 'createFlow', 'describeTemplate', 'enums', 'FlowError', 'ISSUE_KEY_RE', 'issueUrl', 'KEY_RE', 'labels', 'loadTemplate', 'localHost', 'PORT', 'ROUTES', 'schema', 'serve', 'SITE_RE', 'TEMPLATE_IDS', 'textOf', 'validate', 'validateRef', 'VERSION', 'WEB']
+
+await check('api: exports are exactly the public interface; one version; every .mjs starts with a comment', () => {
   const pkg = JSON.parse(text(path.join(ROOT, 'package.json')))
-  assert.deepEqual(Object.keys(api).sort(), [...passport.api].sort())
-  assert.equal(passport.version, pkg.version)
+  assert.deepEqual(Object.keys(api).sort(), [...EXPORTS].sort())
   assert.equal(api.VERSION, pkg.version)
   for (const f of files().filter((x) => x.endsWith('.mjs'))) assert.match(text(f).replace(/^#!.*\n/, ''), /^\/\/ /, rel(f))
 })

@@ -1,0 +1,19 @@
+<!-- jira-flow: the service's own page. The wizard (flow.js) on the page shell (shell.js), styles in flow.css. No inline scripts or styles: the policy below allows only files of this page and calls to its own server. -->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>jira-flow</title>
+<link rel="stylesheet" href="flow.css">
+<script type="module" src="shell.js"></script>
+<script type="module" src="flow.js"></script>
+</head>
+<body>
+<div id="app" class="page" aria-busy="true"><div class="boot"><span class="spin"></span></div></div>
+<div class="tip" role="tooltip" hidden></div>
+<div class="toasts" aria-live="polite"></div>
+</body>
+</html>

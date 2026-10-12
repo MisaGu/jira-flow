@@ -3,7 +3,11 @@
 // parent (on creation and later, a parent Jira refuses does not stop the issue), readIssue.
 import { assert, check, done } from './harness.mjs'
 import { fakeJira } from './fixtures/fake-jira.mjs'
-import { createSync, FlowError, ISSUE_KEY_RE, loadTemplate, markdownToAdf, pathTo, readIssue } from '../index.mjs'
+import { markdownToAdf } from '../src/adf.mjs'
+import { FlowError } from '../src/errors.mjs'
+import { ISSUE_KEY_RE, pathTo, readIssue } from '../src/issues.mjs'
+import { createSync } from '../src/sync.mjs'
+import { loadTemplate } from '../src/template.mjs'
 
 const T = loadTemplate('design-dev')
 const memStore = () => {
