@@ -111,7 +111,7 @@ await check('roles: people of the project only, at least one in a role; saved by
   assert.equal(saved.roles.find((r) => r.key === 'dev').assignName, 'Two')
 })
 
-const EPICS = { parents: [{ key: 'KEY-90', summary: 'Screen · Sign in' }, { key: 'OTHER-1', summary: 'Other', project: 'OTHER' }] }
+const EPICS = { parents: [{ key: 'KEY-90', summary: 'Screen · Sign in' }, { key: 'KEY-91', summary: 'Frame' }, { key: 'KEY-92', summary: 'Plans' }, { key: 'OTHER-1', summary: 'Other', project: 'OTHER' }] }
 const item = (id, status = 'Design Review', extra = {}) => ({ id, summary: `Item ${id}`, body: '## Short\nText', status, notes: [{ id: `ready:${id}`, text: 'ready' }], firstAt: '2026-10-01T10:00:00Z', view: { shown: id }, ...extra })
 function spaceSetup(opts = {}) {
   const jira = fakeJira(T, EPICS)
@@ -179,6 +179,62 @@ await check('sync: on with the chosen items, others wait; new ones go by themsel
   flow.changed('a')
   await flow.idle()
   assert.equal(jira.calls.length, n, 'off — nothing is written')
+  flow.close()
+})
+
+await check('epics by level: the own epic of an item, else of its group, else of the space; null — none; only the issues a change touches move', async () => {
+  const { jira, host, flow } = spaceSetup()
+  const site = 'example.atlassian.net'
+  for (const i of host.saved.items) i.group = i.id === 'c' ? 'two' : 'one'
+  host.space.groups = () => [{ id: 'one', title: 'One' }, { id: 'two', title: 'Two' }, { id: 'three', title: 'Three' }]
+  flow.setLink({ project: 'KEY' })
+  await flow.setEpic({ epic: 'KEY-90' })
+  await assert.rejects(flow.setEpic({ epic: 'KEY-91', group: 'nope' }), (e) => flow.said(e) === ru('error.no_group', { id: 'nope' }))
+  await assert.rejects(flow.setEpic({ epic: 'KEY-91', group: 'one', id: 'a' }), (e) => flow.said(e) === ru('error.epic_target'))
+  await assert.rejects(flow.setEpic({ epic: 'KEY-91', id: 'zzz' }), (e) => flow.said(e) === ru('error.no_item', { id: 'zzz' }))
+  await assert.rejects(flow.setEpic({ epic: 'OTHER-1', group: 'one' }), (e) => flow.said(e) === ru('error.epic_project', { key: 'OTHER-1', other: 'OTHER', project: 'KEY' }))
+  const set = await flow.setEpic({ epic: 'key-91', group: 'one' })
+  fits(set, 'epicSet')
+  assert.deepEqual([set.epic, set.epicInfo.key], ['KEY-90', 'KEY-91'], 'the space keeps its epic')
+  fits(await flow.setEpic({ epic: '', group: 'two' }), 'epicSet')
+  await flow.setEpic({ epic: 'KEY-92', id: 'b' })
+  assert.deepEqual(host.saved.link[site], { project: 'KEY', epic: 'KEY-90', epics: { groups: { one: 'KEY-91', two: null }, items: { b: 'KEY-92' } } })
+  const m = await flow.epics()
+  fits(m, 'epicMap')
+  assert.deepEqual(m.list.map((e) => [e.key, e.url]), [['KEY-90', 'https://example.atlassian.net/browse/KEY-90'], ['KEY-91', 'https://example.atlassian.net/browse/KEY-91'], ['KEY-92', 'https://example.atlassian.net/browse/KEY-92']])
+  assert.deepEqual(m.groups.map((g) => [g.id, g.title, g.items, g.epic, g.own]), [['one', 'One', 2, 'KEY-91', 'KEY-91'], ['two', 'Two', 1, null, null], ['three', 'Three', 0, 'KEY-90', undefined]])
+  assert.deepEqual([m.epic, m.items, m.missing], ['KEY-90', { b: 'KEY-92' }, []])
+
+  flow.setSync({ on: true, ids: ['a', 'b', 'c'] })
+  await flow.idle()
+  const L = host.saved.links[site]
+  assert.deepEqual(['a', 'b', 'c'].map((id) => jira.issues.get(L[id].key).parent), ['KEY-91', 'KEY-92', null])
+  const f = flow.feed()
+  fits(f, 'feed')
+  assert.deepEqual(['a', 'b', 'c'].map((id) => f.items.find((x) => x.id === id).epic), [{ key: 'KEY-91', from: 'group' }, { key: 'KEY-92', from: 'item' }, { key: null, from: 'group' }])
+  assert.equal(f.items.find((x) => x.id === 'c').group, 'two')
+
+  let n = jira.calls.length
+  await flow.setEpic({ epic: '', id: 'b', inherit: true })
+  await flow.idle()
+  assert.deepEqual([jira.issues.get(L.b.key).parent, host.saved.link[site].epics.items], ['KEY-91', {}])
+  assert.deepEqual(jira.calls.slice(n).filter((c) => c.startsWith('PUT')), [`PUT /rest/api/3/issue/${L.b.key}`], 'only b moves')
+  n = jira.calls.length
+  await flow.setEpic({ epic: 'KEY-90', group: 'two' })
+  await flow.idle()
+  assert.equal(jira.issues.get(L.c.key).parent, 'KEY-90')
+  assert.deepEqual(jira.calls.slice(n).filter((c) => c.startsWith('PUT')), [`PUT /rest/api/3/issue/${L.c.key}`], 'only the group moves')
+  n = jira.calls.length
+  await flow.setEpic({ epic: '', group: 'one' })
+  await flow.idle()
+  assert.deepEqual([jira.issues.get(L.a.key).parent, jira.calls.length], ['KEY-91', n], 'no epic: an issue stays where it is')
+
+  host.saved.link[site].epics.items.b = 'KEY-77'
+  assert.deepEqual((await flow.epics()).missing, [{ key: 'KEY-77', problem: ru('error.epic_gone', { key: 'KEY-77', project: 'KEY' }) }])
+  flow.setLink({ project: 'KEY' })
+  assert.equal(host.saved.link[site].epics.groups.two, 'KEY-90', 'the same project keeps the choices')
+  flow.setLink({ project: 'OTHER' })
+  assert.deepEqual(host.saved.link[site], { project: 'OTHER' }, 'another project drops them')
   flow.close()
 })
 

@@ -16,10 +16,10 @@ server (`serve`), which also has a page for a person. Calls and events are a JSO
 - **Roles.** Who leads an issue in which statuses and who may move it into a gate status become Jira transition rules:
   an assignee on entering a status, a restriction on entering a gate. One person in Jira holds every role.
 - **New project.** An empty team-managed project with the template applied (Jira admins only).
-- **A space and its sync.** A space is a host's project whose items become issues: its Jira project, an epic for its
-  issues and a sync switch. With the sync on, every item has one issue: created (or found by its own label), moved
-  along the template to the status the host gives, commented on new notes once, put under the epic, its text
-  rewritten on request; network trouble is retried.
+- **A space and its sync.** A space is a host's project whose items become issues: its Jira project, epics for its
+  issues (the space's, each group's, an item's own) and a sync switch. With the sync on, every item has one issue:
+  created (or found by its own label), moved along the template to the status the host gives, commented on new notes
+  once, put under its epic, its text rewritten on request; network trouble is retried.
 
 ## Where things are
 
@@ -27,7 +27,7 @@ server (`serve`), which also has a page for a person. Calls and events are a JSO
 |---|---|
 | `index.mjs` | the library entry: the service, its contract and what a host shows — nothing else |
 | `main.mjs` | the command line: `serve` (the service and its page), `check`, `apply`, `people`, `projects`, `create`, `template`, `labels`, `help` |
-| `src/engine.mjs` | the engine (`createFlow`): login, projects, template work, roles, a space — its project, epic, sync and feed |
+| `src/engine.mjs` | the engine (`createFlow`): login, projects, template work, roles, a space — its project, epics, sync and feed |
 | `src/hosts.mjs` | `localHost`: the service's own data in one folder |
 | `src/server.mjs` | the server: the page, one route per call of the contract (`ROUTES`), the event stream |
 | `src/schema.mjs` | JSON Schema checks of bodies and results against `contract/` |
@@ -82,7 +82,8 @@ engine methods and HTTP routes; bodies and results are definitions of `contract/
 | `GET /api/space` | `state()` | — | `state` |
 | `POST /api/space/link` | `setLink({ project })` | `project` | `state` |
 | `GET /api/space/epic` | `epic()` | — | `epic` |
-| `POST /api/space/epic` | `setEpic({ epic })` | `setEpic` | `epicSet` |
+| `GET /api/space/epics` | `epics()` | — | `epicMap` |
+| `POST /api/space/epic` | `setEpic({ epic, group, id, inherit })` | `setEpic` | `epicSet` |
 | `GET /api/space/sync` | `sync()` | — | `sync` |
 | `POST /api/space/sync` | `setSync({ on, ids })` | `setSync` | `sync` |
 | `POST /api/space/add` | `add({ id })` | `add` | `sync` |
@@ -104,15 +105,16 @@ host = {
   account: { get() → { site, email, token, source? } | null, save({ site, email, token }), forget(), view?() → {} },
   roles:   { get(site, key) → { <role>: { people, assign } }, save(site, key, roles) },
   space?:  { id,
-             link:  { get(site) → { project, epic? } | null, set(site, { project, epic? }) },
+             link:  { get(site) → { project, epic?, epics? } | null, set(site, { project, epic?, epics? }) },
              sync:  { get() → { on, since }, set(patch) },
              links: { get(site, id), put(site, id, patch) → link, all(site) → { <id>: link } },
-             items(id?) → [{ id, summary, body?, status, notes?, firstAt?, at?, view? }] },
+             items(id?) → [{ id, summary, body?, status, notes?, group?, firstAt?, at?, view? }],
+             groups?() → [{ id, title }] },
 }
 ```
 
 `localHost({ home })` keeps it all in one folder: `login.json` (site, email), `secrets.json` (tokens by site, mode
-600), `roles.json`, `space.json` (the Jira project and epic by site, the sync switch), `links.json` (item ↔ issue by
+600), `roles.json`, `space.json` (the Jira project and epics by site, the sync switch), `links.json` (item ↔ issue by
 site) and `items.json` (items a client put through `POST api/space/items`). A host of another program passes its own
 object: its login store, its project as the space, its items with `view` — what it shows of an item, which the feed
 gives back as is. A link keeps `key`, `project`, `label`, `applied`, `seen`, `parent` and `error`; the host may keep
@@ -128,6 +130,8 @@ const flow = createFlow({ host, emit: (event, data) => toPage(event, data), lang
 await flow.check({ project: 'KEY' })            // items, plan, what applying would do, roles — with texts in lang
 flow.setLink({ project: 'KEY' })
 await flow.setEpic({ epic: 'KEY-7' })          // checked in Jira: in the project, one level above a task
+await flow.setEpic({ epic: 'KEY-8', group: 'g1' })  // the epic of a group; { id } — an item's own
+await flow.epics()                             // the project's epics to pick from, every group with its choice
 flow.setSync({ on: true, ids: ['item-1'] })    // these existing items go at once, new ones by themselves
 flow.changed(['item-2'])                       // the host's item changed: its issue follows once the change settles
 flow.said(error)                               // what to show a person for an error
@@ -138,13 +142,25 @@ const s = await serve({ host: localHost({ home }), lang: 'en' })   // s.url, s.c
 
 ## Parent issue
 
-The epic of a space is the parent of its issues.
+An issue goes under the epic of its item: the item's own, else its group's, else the space's.
 
-- A new issue is created under the epic in the same request (`fields.parent = { key }`).
-- An issue made earlier without a parent, or under another one, gets the epic on the next sync step: the link keeps the
-  parent written last, and the engine writes it again only when the epic changes. Setting an epic with the sync on
-  sends every item through the sync at once.
-- No epic leaves an issue's parent as it is: the engine never takes an issue out of an epic.
+- A group is the host's way to sort its items (a section, a screen): an item names its `group`, the host may list
+  every group with `groups()` — those without items too, so their epics can be chosen ahead. Without `groups()` the
+  groups are the ones the items name.
+- The choices live in the space's link: `epic` — the space's; `epics.groups` and `epics.items` — `{ <id>: key | null }`.
+  An entry is that level's choice, `null` — no epic (the level above is not asked); no entry — the level above
+  decides. `setEpic({ epic, group })` and `setEpic({ epic, id })` set one, an empty `epic` — no epic, `inherit: true`
+  drops the entry. Another Jira project drops every choice; the same one keeps them.
+- `epics()` reads the project's epics from Jira (the types one level above a task, whatever their name) and gives
+  every level at once: the space's epic, each group with its own choice and the epic its items get, the items' own
+  choices and the chosen keys Jira no longer has as epics of the project.
+- A new issue is created under its epic in the same request (`fields.parent = { key }`).
+- An issue made earlier without a parent, or under another one, gets its epic on the next sync step: the link keeps
+  the parent written last, and the engine writes it again only when the item's epic changes. A choice set with the
+  sync on sends the items it touches through the sync at once: a group's — its items, an item's — that item, the
+  space's — every item; an issue whose epic did not change is not written.
+- No epic leaves an issue's parent as it is: the engine never takes an issue out of an epic. A person who moves an
+  issue to another epic in Jira keeps it there until the item's epic changes in the host.
 - An epic Jira refuses (gone, not visible to the login, not one level up, another project) does not stop the issue: it
   is created without a parent, status and notes keep up, and every step reports the refusal as an `error` event until
   the epic is fixed. `epic()` says what is wrong with the epic now.

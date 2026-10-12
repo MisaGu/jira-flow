@@ -1,6 +1,6 @@
 // The service engine: everything a host does with Jira, behind one object. The host says where the login, the saved
 // roles and a space live (src/hosts.mjs, or the caller's own object of the same shape); a space is the host's project
-// whose items become issues — its Jira project and epic, the sync switch, the links item ↔ issue. The engine owns the
+// whose items become issues — its Jira project and epics, the sync switch, the links item ↔ issue. The engine owns the
 // Jira client, the template work (check, apply, a new project, roles), the epic check and the sync queue. Every method
 // returns plain JSON, the results of contract/calls.schema.json; what the sync does goes to emit('jira', event)
 // (contract/events.schema.json). Errors are FlowError with a code, an English message and text — the same for a person
@@ -11,17 +11,23 @@
 //   account: { get() → { site, email, token, source? } | null, save({ site, email, token }), forget(), view?() → {} },
 //   roles:   { get(site, key) → { <role>: { people, assign } }, save(site, key, roles) },
 //   space?:  { id,                                       — makes issue labels unique per space
-//              link:  { get(site) → { project, epic? } | null, set(site, { project, epic? }) },
+//              link:  { get(site) → { project, epic?, epics? } | null, set(site, { project, epic?, epics? }) },
 //              sync:  { get() → { on, since }, set(patch) },
 //              links: { get(site, id), put(site, id, patch) → link, all(site) → { <id>: link } },
-//              items(id?) → [{ id, summary, body?, status, notes?, firstAt?, at?, view? }] },
+//              items(id?) → [{ id, summary, body?, status, notes?, group?, firstAt?, at?, view? }],
+//              groups?() → [{ id, title }] },                — every group, those without items too
 // }
+//
+// Epics: the issue of an item goes under its own epic, else its group's, else the space's (epic). epics = { groups:
+// { <group id>: key | null }, items: { <item id>: key | null } } — an entry is that level's choice, null — no epic,
+// the level above is not asked; no entry — the level above decides. A group is the host's way to sort its items (a
+// section, a screen); without groups() the groups are the ones the items name.
 import { applyTemplate, createFromTemplate, inspect } from './apply.mjs'
 import { describe } from './check.mjs'
 import { boardUrl, createClient, issueUrl, siteCloudId, SITE_RE } from './client.mjs'
 import { enums } from './enums.mjs'
 import { fail, FlowError } from './errors.mjs'
-import { ISSUE_KEY_RE, readIssue } from './issues.mjs'
+import { ISSUE_KEY_RE, listEpics, readIssue } from './issues.mjs'
 import { checkLang, labels, textOf } from './lang.mjs'
 import { isAdmin, KEY_RE, listProjects, readPeople } from './project.mjs'
 import { createSync } from './sync.mjs'
@@ -43,7 +49,7 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
   lang = checkLang(lang)
   const tpl = typeof template === 'string' ? loadTemplate(template) : validateTemplate(template)
   const viaFetch = f ? { fetch: f } : {}
-  const op = { inspect, applyTemplate, createFromTemplate, listProjects, isAdmin, readPeople, readIssue, cloudId: (site) => siteCloudId(site, viaFetch), ...ops }
+  const op = { inspect, applyTemplate, createFromTemplate, listProjects, isAdmin, readPeople, readIssue, listEpics, cloudId: (site) => siteCloudId(site, viaFetch), ...ops }
   const text = (key, vars) => textOf(key, lang, vars)
   // An error a person reads: the code, an English message, the text in lang.
   const err = (code, key, vars = {}) => new FlowError(code, textOf(key, 'en', vars), { text: text(key, vars) })
@@ -230,16 +236,37 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
     return roles({ project: key })
   }
 
-  // ── a space: its Jira project and epic, the sync of its items ──────────────────────────────────────────────────
+  // ── a space: its Jira project and epics, the sync of its items ─────────────────────────────────────────────────
   const sp = host.space || null
   function spaceOnly() {
     if (!sp) throw err('INPUT', 'error.no_space')
   }
   const epicOf = (l) => (ISSUE_KEY_RE.test(l?.epic || '') ? l.epic : null)
+  // A level's choices: a key or null (no epic); anything else is dropped.
+  const choices = (m) => Object.fromEntries(Object.entries(m && typeof m === 'object' ? m : {}).filter(([, v]) => v === null || ISSUE_KEY_RE.test(String(v))))
   function link() {
     const s = site()
     const l = s && sp ? sp.link.get(s) : null
-    return l?.project ? { site: s, project: l.project, epic: epicOf(l) } : null
+    return l?.project ? { site: s, project: l.project, epic: epicOf(l), epics: { groups: choices(l.epics?.groups), items: choices(l.epics?.items) } } : null
+  }
+  // The link as the host keeps it: the epics only when some level has a choice.
+  function putLink(l, { epic = l.epic, epics = l.epics } = {}) {
+    const some = Object.keys(epics.groups).length + Object.keys(epics.items).length > 0
+    sp.link.set(l.site, { project: l.project, ...(epic ? { epic } : {}), ...(some ? { epics } : {}) })
+  }
+  const choiceOf = (m, k) => (k != null && Object.hasOwn(m, String(k)) ? m[String(k)] : undefined)
+  // The epic of an item and whose choice it is: item, group, space; none — key null.
+  function epicFor(item, l = link()) {
+    if (!l) return { key: null, from: null }
+    for (const [from, v] of [['item', choiceOf(l.epics.items, item.id)], ['group', choiceOf(l.epics.groups, item.group)]]) if (v !== undefined) return { key: v, from }
+    return { key: l.epic, from: l.epic ? 'space' : null }
+  }
+  // The groups of the space with how many items each has: the host's list, or the groups its items name.
+  function groupsOf() {
+    const n = new Map()
+    for (const i of sp.items()) if (i.group != null && i.group !== '') n.set(String(i.group), (n.get(String(i.group)) || 0) + 1)
+    const list = sp.groups ? sp.groups() : [...n.keys()].map((id) => ({ id, title: id }))
+    return list.map((g) => ({ id: String(g.id), title: String(g.title ?? g.id), items: n.get(String(g.id)) || 0 }))
   }
   function syncNow() {
     const v = sp?.sync.get() || {}
@@ -251,15 +278,14 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
   }
   const store = { get: (id) => sp.links.get(site(), id) || null, put: (id, patch) => sp.links.put(site(), id, patch) }
 
-  // The Jira project of the space; the epic belongs to it: the same project keeps the epic, another drops it.
+  // The Jira project of the space; the epics belong to it: the same project keeps them, another drops them.
   function setLink({ project } = {}) {
     spaceOnly()
     const s = site()
     if (!s) throw err('NO_LOGIN', 'error.no_login')
     const key = keyOf(project)
     const was = link()
-    const epic = was?.project === key ? was.epic : null
-    sp.link.set(s, { project: key, ...(epic ? { epic } : {}) })
+    putLink({ site: s, project: key }, was?.project === key ? was : { epic: null, epics: { groups: {}, items: {} } })
     return state()
   }
 
@@ -277,7 +303,7 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
     if (!isEpic(i)) throw err('INPUT', 'error.epic_type', { key: i.key, type: i.type })
     return { key: i.key, summary: i.summary, status: i.status, url: issueUrl(site(), i.key) }
   }
-  // The epic as Jira has it now: there and still an epic — ok; otherwise the reason.
+  // The space's epic as Jira has it now: there and still an epic — ok; otherwise the reason.
   async function epic() {
     spaceOnly()
     const l = link()
@@ -288,22 +314,46 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
       return { key: l.epic, url: issueUrl(l.site, l.epic), ok: false, problem: said(e) }
     }
   }
-  // Set the epic (checked in Jira) or drop it (empty). With the sync on, the issues already in Jira go under the new
-  // epic at once; dropped — new issues go without an epic, earlier ones stay under it.
-  async function setEpic({ epic: raw } = {}) {
+  // Every level at once: the Jira project's epics to pick from, the space's epic, each group with its choice and the
+  // epic its items get, the items' own choices; a chosen key that is no longer an epic of the project — with why.
+  async function epics() {
     spaceOnly()
     const l = link()
     if (!l?.project) throw err('INPUT', 'error.no_project')
-    const key = String(raw ?? '').trim().toUpperCase()
-    if (!key) {
-      sp.link.set(l.site, { project: l.project })
-      return { ...state(), epicInfo: { key: null } }
+    const list = (await op.listEpics(need(), l.project)).map((e) => ({ key: e.key, summary: e.summary, status: e.status, url: issueUrl(l.site, e.key) }))
+    const groups = groupsOf().map((g) => {
+      const own = choiceOf(l.epics.groups, g.id)
+      return { ...g, epic: own === undefined ? l.epic : own, ...(own !== undefined ? { own } : {}) }
+    })
+    const known = new Set(list.map((e) => e.key))
+    const chosen = new Set([l.epic, ...Object.values(l.epics.groups), ...Object.values(l.epics.items)].filter(Boolean))
+    const missing = [...chosen].filter((k) => !known.has(k)).map((key) => ({ key, problem: text('error.epic_gone', { key, project: l.project }) }))
+    return { project: l.project, epic: l.epic, list, groups, items: l.epics.items, missing }
+  }
+  // Set an epic (checked in Jira) or drop it (empty): the space's; a group's (group); an item's own (id). A group or
+  // an item set to empty gets no epic at all; inherit — its choice goes, the level above decides. With the sync on,
+  // the issues it touches go under the new epic at once; an issue left without an epic stays where it is.
+  async function setEpic({ epic: raw, group = null, id = null, inherit = false } = {}) {
+    spaceOnly()
+    const l = link()
+    if (!l?.project) throw err('INPUT', 'error.no_project')
+    if (group != null && id != null) throw err('INPUT', 'error.epic_target')
+    const level = id != null ? 'items' : group != null ? 'groups' : null
+    const at = level ? String(level === 'items' ? id : group) : null
+    if (level === 'items' && !sp.items(at).length) throw err('INPUT', 'error.no_item', { id: at })
+    if (level === 'groups' && !groupsOf().some((g) => g.id === at)) throw err('INPUT', 'error.no_group', { id: at })
+    const key = inherit ? '' : String(raw ?? '').trim().toUpperCase()
+    if (key && !ISSUE_KEY_RE.test(key)) throw err('INPUT', 'error.epic_key', { project: l.project, raw: String(raw).trim() })
+    const info = key ? await readEpic(key, l.project) : null
+    if (!level) putLink(l, { epic: info?.key || null })
+    else {
+      const m = { ...l.epics[level] }
+      if (inherit) delete m[at]
+      else m[at] = info?.key || null
+      putLink(l, { epics: { ...l.epics, [level]: m } })
     }
-    if (!ISSUE_KEY_RE.test(key)) throw err('INPUT', 'error.epic_key', { project: l.project, raw: String(raw).trim() })
-    const info = await readEpic(key, l.project)
-    sp.link.set(l.site, { project: l.project, epic: info.key })
-    if (syncNow().on) reconcileAll()
-    return { ...state(), epicInfo: { ...info, ok: true } }
+    if (syncNow().on) reconcileAll(level === 'items' ? (i) => i.id === at : level === 'groups' ? (i) => String(i.group ?? '') === at : null)
+    return { ...state(), epicInfo: info ? { ...info, ok: true } : { key: null } }
   }
 
   const engine = sp ? createSync({ client, project: () => link()?.project, template: tpl, store, scope: sp.id || '', prefix, onEvent: (e) => emit('jira', e), ...(retryMs ? { retryMs } : {}) }) : null
@@ -333,25 +383,28 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
       return
     }
     try {
-      engine.push({ id, summary: item.summary, body: item.body || '', status: item.status, notes: Array.isArray(item.notes) ? item.notes : [], parent: st.epic })
+      engine.push({ id, summary: item.summary, body: item.body || '', status: item.status, notes: Array.isArray(item.notes) ? item.notes : [], parent: epicFor(item).key })
     } catch (e) {
       store.put(id, { error: { code: e.code || 'INPUT', message: e.message } })
       emit('jira', { type: enums.event.ERROR, id, code: e.code || 'INPUT', message: e.message, retry: false })
     }
   }
-  function reconcileAll() {
-    for (const i of sp.items()) schedule(i.id, 0)
+  // Every item, or those pick takes.
+  function reconcileAll(pick = null) {
+    for (const i of sp.items()) if (!pick || pick(i)) schedule(i.id, 0)
   }
-  const startTimer = sp && autostart && syncNow().on ? setTimeout(reconcileAll, startMs) : null
+  const startTimer = sp && autostart && syncNow().on ? setTimeout(() => reconcileAll(), startMs) : null
 
   const linkView = (l) =>
     l ? { key: l.key || null, url: l.key ? issueUrl(site(), l.key) : null, applied: l.applied || null, parent: l.parent || null, error: !l.error ? null : typeof l.error === 'string' ? l.error : said(l.error), skip: Boolean(l.skip), pending: Boolean(l.pending) } : null
-  // The items with their issues on this site; view — what the host shows of an item, as it gave it.
+  // The items with their issues on this site; view — what the host shows of an item, as it gave it; epic — the one
+  // its issue goes under and whose choice it is.
   function feed({ max = FEED_MAX } = {}) {
     spaceOnly()
     const s = site()
     const links = s ? sp.links.all(s) || {} : {}
-    const all = sp.items().map((i) => ({ id: i.id, summary: i.summary, status: i.status, at: i.at || null, ...(i.view || {}), jira: linkView(links[i.id]) }))
+    const l = link()
+    const all = sp.items().map((i) => ({ id: i.id, summary: i.summary, status: i.status, at: i.at || null, ...(i.view || {}), group: i.group ?? null, epic: epicFor(i, l), jira: linkView(links[i.id]) }))
     const by = (name) => all.filter((i) => i.status === name).length
     return { total: all.length, items: all.slice(0, max), byStatus: Object.fromEntries(tpl.statuses.map((x) => [x.name, by(x.name)])), sync: state(), linked: all.filter((i) => i.jira?.key).length }
   }
@@ -417,6 +470,7 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
     state,
     setLink,
     epic,
+    epics,
     setEpic,
     sync: syncView,
     setSync,

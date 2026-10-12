@@ -108,8 +108,13 @@
         "body": null,
         "result": "epic"
       },
+      "GET /api/space/epics": {
+        "call": "epics()",
+        "body": null,
+        "result": "epicMap"
+      },
       "POST /api/space/epic": {
-        "call": "setEpic({ epic })",
+        "call": "setEpic({ epic, group, id, inherit })",
         "body": "setEpic",
         "result": "epicSet"
       },
@@ -267,10 +272,24 @@
       "required": [
         "epic"
       ],
+      "description": "the space's epic; with group — that group's; with id — that item's own (not both); an empty epic for a group or an item — no epic at all; inherit — the group's or the item's choice goes, the level above decides",
       "properties": {
         "epic": {
           "type": "string",
           "maxLength": 40
+        },
+        "group": {
+          "type": "string",
+          "maxLength": 500,
+          "minLength": 1
+        },
+        "id": {
+          "type": "string",
+          "maxLength": 500,
+          "minLength": 1
+        },
+        "inherit": {
+          "type": "boolean"
         }
       }
     },
@@ -365,6 +384,11 @@
               }
             }
           }
+        },
+        "group": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "the host's group of the item (a section, a screen): an epic per group"
         },
         "firstAt": {
           "type": "string",
@@ -939,6 +963,148 @@
         }
       }
     },
+    "epicMap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "epic",
+        "list",
+        "groups",
+        "items",
+        "missing"
+      ],
+      "description": "the epics of a space: the Jira project's epics to pick from, the space's epic, every group with its choice, the items' own choices, chosen keys Jira no longer has as epics of the project",
+      "properties": {
+        "project": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "epic": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "list": {
+          "type": "array",
+          "maxItems": 500,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "summary",
+              "status",
+              "url"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "summary": {
+                "type": "string",
+                "maxLength": 255
+              },
+              "status": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 60
+              },
+              "url": {
+                "type": "string",
+                "maxLength": 500
+              }
+            }
+          }
+        },
+        "groups": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "items",
+              "epic"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 500,
+                "minLength": 1
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 500,
+                "x-lang": true
+              },
+              "items": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "items of the group in the space now"
+              },
+              "epic": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 40,
+                "description": "the epic its items get: its own choice, else the space's"
+              },
+              "own": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 40,
+                "description": "present when the group has its own choice"
+              }
+            }
+          }
+        },
+        "items": {
+          "type": "object",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 40,
+            "description": "an epic key; null — no epic"
+          },
+          "description": "item id → its own choice"
+        },
+        "missing": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "problem"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "problem": {
+                "type": "string",
+                "maxLength": 4000
+              }
+            }
+          }
+        }
+      }
+    },
     "sync": {
       "type": "object",
       "additionalProperties": false,
@@ -1083,6 +1249,43 @@
             "null"
           ],
           "maxLength": 40
+        },
+        "group": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500
+        },
+        "epic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "key",
+            "from"
+          ],
+          "description": "the epic the item's issue goes under and whose choice it is: the item's own, its group's or the space's; none — key and from null",
+          "properties": {
+            "key": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 40
+            },
+            "from": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "enum": [
+                "item",
+                "group",
+                "space",
+                null
+              ]
+            }
+          }
         },
         "jira": {
           "anyOf": [

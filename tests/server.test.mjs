@@ -87,7 +87,9 @@ await check('flow and space over HTTP: every result fits the contract; items put
     ['POST /api/space/epic', () => post('/api/space/epic', { epic: 'KEY-90' })],
     ['GET /api/space/epic', () => get('/api/space/epic')],
     ['POST /api/space/sync', () => post('/api/space/sync', { on: true, ids: [] })],
-    ['POST /api/space/items', () => post('/api/space/items', { items: [{ id: 'a', summary: 'Item A', status: 'Design Review', notes: [{ id: 'n1', text: 'ready' }] }, { id: 'b', summary: 'Item B', status: 'Design' }] })],
+    ['POST /api/space/items', () => post('/api/space/items', { items: [{ id: 'a', summary: 'Item A', status: 'Design Review', notes: [{ id: 'n1', text: 'ready' }], group: 'one' }, { id: 'b', summary: 'Item B', status: 'Design' }] })],
+    ['POST /api/space/epic', () => post('/api/space/epic', { epic: 'KEY-90', group: 'one' })],
+    ['GET /api/space/epics', () => get('/api/space/epics')],
   ]
   for (const [route, call] of calls) {
     const r = await call()

@@ -1,8 +1,8 @@
 // The REST client with a fake fetch: Basic auth, error codes, the gateway after 401/403 on the site, cloudId; issue
-// requests on the wire (read, parent on creation and later).
+// requests on the wire (read, parent on creation and later, the epics of a project page by page).
 import { assert, check, done } from './harness.mjs'
 import { createClient, siteCloudId } from '../src/client.mjs'
-import { createIssue, readIssue, setParent } from '../src/issues.mjs'
+import { createIssue, listEpics, readIssue, setParent } from '../src/issues.mjs'
 
 const CLOUD = '11111111-2222-4333-8444-555555555555'
 const reply = (status, body) => ({ ok: status < 300, status, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body })
@@ -69,6 +69,22 @@ await check('issues on the wire: readIssue asks for the parent fields and reads 
   assert.equal('parent' in f.seen[2].body.fields, false)
   await setParent(jira, 'KEY-8', 'KEY-7')
   assert.deepEqual([f.seen[3].method, f.seen[3].body], ['PUT', { fields: { parent: { key: 'KEY-7' } } }])
+})
+
+await check('the epics of a project: by the types one level above a task, whatever their name; page by page', async () => {
+  const page = (keys, next) => reply(200, { issues: keys.map((k) => ({ id: k, key: k, fields: { summary: `S ${k}`, status: { name: 'To Do' } } })), ...(next ? { isLast: false, nextPageToken: next } : { isLast: true }) })
+  const f = fakeFetch([
+    [/\/rest\/api\/3\/project\/KEY$/, () => reply(200, { id: '10000', key: 'KEY', issueTypes: [{ id: '20', name: 'Big', hierarchyLevel: 1 }, { id: '21', name: 'Task', hierarchyLevel: 0 }, { id: '22', name: 'Sub', hierarchyLevel: -1 }] })],
+    [/nextPageToken=t2/, () => page(['KEY-9'])],
+    [/\/rest\/api\/3\/search\/jql/, () => page(['KEY-3', 'KEY-4'], 't2')],
+  ])
+  const jira = createClient({ site: 'seven.atlassian.net', email: 'a@b.c', token: 'tok', fetch: f })
+  assert.deepEqual((await listEpics(jira, 'KEY')).map((e) => [e.key, e.summary, e.status]), [['KEY-3', 'S KEY-3', 'To Do'], ['KEY-4', 'S KEY-4', 'To Do'], ['KEY-9', 'S KEY-9', 'To Do']])
+  assert.match(decodeURIComponent(f.seen[1].url), /project = "KEY" AND issuetype in \(20\) ORDER BY key ASC/)
+  assert.equal((await listEpics(jira, 'KEY', { max: 2 })).length, 2)
+  const none = fakeFetch([[/\/rest\/api\/3\/project\/KEY$/, () => reply(200, { id: '1', key: 'KEY', issueTypes: [{ id: '21', name: 'Task', hierarchyLevel: 0 }] })]])
+  assert.deepEqual(await listEpics(createClient({ site: 'seven.atlassian.net', email: 'a@b.c', token: 'tok', fetch: none }), 'KEY'), [])
+  assert.equal(none.seen.length, 1, 'no epic type — no search')
 })
 
 done('client')

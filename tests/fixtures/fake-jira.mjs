@@ -1,5 +1,6 @@
 // An in-memory Jira for issue work (the client interface: get, post, put, site, cloudId): issues of one project,
-// transitions from the template graph, search only by label, comments, text updates, parents. parents — issues one
+// transitions from the template graph, search by label or by issue type (the parents of a project), the project's
+// issue types, comments, text updates, parents. parents — issues one
 // level up that may hold others ({ key, summary, project, type, level, status }); a parent that is not there is refused
 // as Jira does (400, errors.parent). calls — every request made; an issue keeps the fields it was created with.
 import assert from 'node:assert/strict'
@@ -26,6 +27,11 @@ export function fakeJira(tpl, { project = 'KEY', parents = [] } = {}) {
     calls,
     async get(route) {
       calls.push(`GET ${route.split('?')[0]}`)
+      if (route.startsWith('/rest/api/3/project/')) return { id: '10000', key: project, issueTypes: [{ id: '10001', name: 'Epic', hierarchyLevel: 1 }, { id: '10002', name: 'Task', hierarchyLevel: 0 }] }
+      if (route.startsWith('/rest/api/3/search/jql') && /issuetype in \(10001\)/.test(decodeURIComponent(route))) {
+        const p = /project = "([^"]+)"/.exec(decodeURIComponent(route))[1]
+        return { isLast: true, issues: [...tops.values()].filter((t) => t.project === p).map((t) => ({ id: `9${t.key.split('-')[1]}`, key: t.key, fields: { summary: t.summary, status: { name: t.status } } })) }
+      }
       if (route.startsWith('/rest/api/3/search/jql')) {
         const lbl = /labels = "([^"]+)"/.exec(decodeURIComponent(route))[1]
         return { issues: [...issues.values()].filter((i) => i.labels.includes(lbl)).map((i) => ({ id: i.id, key: i.key, fields: { status: { name: i.status }, ...withParent(i.parent) } })) }
