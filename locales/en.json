@@ -57,6 +57,7 @@
       "created": "created",
       "moved": "moved",
       "commented": "commented",
+      "parent": "parent set",
       "text": "text updated",
       "error": "error"
     }

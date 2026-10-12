@@ -20,5 +20,5 @@ export const enums = Object.freeze({
   via: makeEnum('via', ['api', 'manual', 'check']),
   role: makeEnum('role', ['design', 'lead', 'dev', 'qa']),
   // What the sync engine reports to its host.
-  event: makeEnum('event', ['created', 'moved', 'commented', 'text', 'error']),
+  event: makeEnum('event', ['created', 'moved', 'commented', 'parent', 'text', 'error']),
 })

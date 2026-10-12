@@ -7,7 +7,7 @@ import { checkProject, describe, planFor, rulesItem } from './src/check.mjs'
 import { boardUrl, createClient, issueUrl, siteCloudId, SITE_RE } from './src/client.mjs'
 import { enums } from './src/enums.mjs'
 import { FlowError, retryable } from './src/errors.mjs'
-import { addComment, createIssue, findByLabel, moveTo, pathTo, setText, statusOf } from './src/issues.mjs'
+import { addComment, createIssue, findByLabel, ISSUE_KEY_RE, moveTo, pathTo, readIssue, setParent, setText, statusOf } from './src/issues.mjs'
 import { checkLang, labels, textOf } from './src/lang.mjs'
 import { createProject, isAdmin, KEY_RE, listProjects, readPeople, readProject } from './src/project.mjs'
 import { createSync } from './src/sync.mjs'
@@ -44,6 +44,7 @@ export {
   inspect,
   isAdmin,
   issueUrl,
+  ISSUE_KEY_RE,
   KEY_RE,
   labels,
   listProjects,
@@ -54,6 +55,7 @@ export {
   planColumns,
   planFor,
   readColumns,
+  readIssue,
   readPeople,
   readProject,
   retryable,
@@ -61,6 +63,7 @@ export {
   rolesFor,
   rulesFor,
   rulesItem,
+  setParent,
   setText,
   siteCloudId,
   SITE_RE,
