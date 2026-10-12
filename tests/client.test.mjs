@@ -1,7 +1,8 @@
 // The REST client with a fake fetch: Basic auth, error codes, the gateway after 401/403 on the site, cloudId; issue
 // requests on the wire (read, parent on creation and later).
 import { assert, check, done } from './harness.mjs'
-import { createClient, createIssue, readIssue, setParent, siteCloudId } from '../index.mjs'
+import { createClient, siteCloudId } from '../src/client.mjs'
+import { createIssue, readIssue, setParent } from '../src/issues.mjs'
 
 const CLOUD = '11111111-2222-4333-8444-555555555555'
 const reply = (status, body) => ({ ok: status < 300, status, text: async () => (body === undefined ? '' : JSON.stringify(body)), json: async () => body })

@@ -1,6 +1,10 @@
 // Template, project check, plan, workflow update, roles and rules, board columns — pure functions, no Jira.
 import { assert, check, done } from './harness.mjs'
-import { arrangeColumns, blockedFor, buildUpdate, checkProject, describe, describeTemplate, loadTemplate, planColumns, planFor, rolesFor, rulesFor, validateTemplate, wantedOrder } from '../index.mjs'
+import { blockedFor } from '../src/apply.mjs'
+import { arrangeColumns, planColumns, wantedOrder } from '../src/board.mjs'
+import { checkProject, describe, planFor } from '../src/check.mjs'
+import { describeTemplate, loadTemplate, rolesFor, rulesFor, validateTemplate } from '../src/template.mjs'
+import { buildUpdate } from '../src/workflow.mjs'
 
 const T = loadTemplate('design-dev')
 const CYR = /\p{Script=Cyrillic}/u

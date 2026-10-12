@@ -1,14 +1,25 @@
 #!/usr/bin/env node
-// jira-flow command line: the only entry for a terminal. Connection — flags or JIRA_FLOW_SITE, JIRA_FLOW_EMAIL,
-// JIRA_FLOW_TOKEN_FILE; the token is read from a file, never from a flag. Results are JSON on stdout; an error is
-// { "error": { "code", "message" } } on stderr. Exit codes: 0 — done, 1 — failed, 2 — usage.
+// jira-flow command line: the service with its page (serve) and the template work from a terminal. Connection of the
+// terminal commands — flags or JIRA_FLOW_SITE, JIRA_FLOW_EMAIL, JIRA_FLOW_TOKEN_FILE; the token is read from a file,
+// never from a flag. Results are JSON on stdout; an error is { "error": { "code", "message" } } on stderr. Exit codes:
+// 0 — done, 1 — failed, 2 — usage.
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { parseArgs } from 'node:util'
-import { applyTemplate, checkLang, createClient, createFromTemplate, describe, describeTemplate, inspect, labels, listProjects, loadTemplate, readPeople } from './index.mjs'
+import { applyTemplate, createFromTemplate, inspect } from './src/apply.mjs'
+import { describe } from './src/check.mjs'
+import { createClient } from './src/client.mjs'
+import { localHost } from './src/hosts.mjs'
+import { checkLang, labels } from './src/lang.mjs'
+import { listProjects, readPeople } from './src/project.mjs'
+import { PORT, serve } from './src/server.mjs'
+import { describeTemplate, loadTemplate } from './src/template.mjs'
 
 const HELP = `jira-flow <command> [flags]
 
 Commands
+  serve     [--port N] [--home DIR]  the service and its page on 127.0.0.1 (port ${PORT}); data — DIR (~/.jira-flow)
   check     --project KEY            the project against the template, with the plan
   apply     --project KEY [--dry-run] apply the template (dry run: Jira validates, nothing is written)
   people    --project KEY            people of the project and the login
@@ -45,6 +56,8 @@ try {
       roles: { type: 'string' },
       lang: { type: 'string' },
       'dry-run': { type: 'boolean' },
+      port: { type: 'string' },
+      home: { type: 'string' },
     },
   })
 } catch (e) {
@@ -68,6 +81,16 @@ try {
   const lang = checkLang(f.lang)
   const template = loadTemplate(f.template || 'design-dev')
   if (command === 'help') process.stdout.write(HELP)
+  else if (command === 'serve') {
+    const port = f.port === undefined ? PORT : Number(f.port)
+    if (!Number.isInteger(port) || port < 0 || port > 65535) usage('--port must be a port number')
+    const home = path.resolve(f.home || process.env.JIRA_FLOW_HOME || path.join(os.homedir(), '.jira-flow'))
+    const s = await serve({ port, host: localHost({ home }), lang })
+    process.stderr.write(`jira-flow: ${s.url} · data — ${home}\n`)
+    const stop = () => s.close().then(() => (process.exitCode = EXIT.OK))
+    process.once('SIGINT', stop)
+    process.once('SIGTERM', stop)
+  }
   else if (command === 'labels') out(labels(lang))
   else if (command === 'template') out(describeTemplate(template, lang))
   else if (command === 'projects') out(await listProjects(client()))

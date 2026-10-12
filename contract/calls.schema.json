@@ -1,0 +1,1157 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jira-flow/calls",
+  "title": "Calls of the service",
+  "description": "Every call answers an envelope: { ok: true, result } or { ok: false, error, code }. The same calls are methods of the engine (createFlow) and HTTP routes of the server (serve): $defs.routes — route → method → body → result. A POST needs the header x-flow: 1; bodies are checked against their definition before the engine sees them.",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "result"
+      ],
+      "properties": {
+        "ok": {
+          "const": true
+        },
+        "result": true
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ok",
+        "error"
+      ],
+      "properties": {
+        "ok": {
+          "const": false
+        },
+        "error": {
+          "type": "string",
+          "maxLength": 8000
+        },
+        "code": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "routes": {
+      "description": "route → { call — the engine method, body — a definition here or null (GET; query — the parameter), result — a definition here }",
+      "GET /api/flow": {
+        "call": "overview()",
+        "body": null,
+        "result": "overview"
+      },
+      "GET /api/flow/labels": {
+        "call": "labels()",
+        "body": null,
+        "result": "labels"
+      },
+      "POST /api/flow/login": {
+        "call": "login({ site, email, token })",
+        "body": "login",
+        "result": "overview"
+      },
+      "POST /api/flow/logout": {
+        "call": "logout()",
+        "body": "empty",
+        "result": "overview"
+      },
+      "GET /api/flow/check": {
+        "call": "check({ project })",
+        "body": null,
+        "query": "project",
+        "result": "check"
+      },
+      "POST /api/flow/apply": {
+        "call": "apply({ project, dryRun })",
+        "body": "apply",
+        "result": "applied"
+      },
+      "POST /api/flow/create": {
+        "call": "create({ key, name })",
+        "body": "create",
+        "result": "applied"
+      },
+      "GET /api/flow/roles": {
+        "call": "roles({ project })",
+        "body": null,
+        "query": "project",
+        "result": "roles"
+      },
+      "POST /api/flow/roles": {
+        "call": "saveRoles({ project, roles })",
+        "body": "saveRoles",
+        "result": "roles"
+      },
+      "GET /api/space": {
+        "call": "state()",
+        "body": null,
+        "result": "state"
+      },
+      "POST /api/space/link": {
+        "call": "setLink({ project })",
+        "body": "project",
+        "result": "state"
+      },
+      "GET /api/space/epic": {
+        "call": "epic()",
+        "body": null,
+        "result": "epic"
+      },
+      "POST /api/space/epic": {
+        "call": "setEpic({ epic })",
+        "body": "setEpic",
+        "result": "epicSet"
+      },
+      "GET /api/space/sync": {
+        "call": "sync()",
+        "body": null,
+        "result": "sync"
+      },
+      "POST /api/space/sync": {
+        "call": "setSync({ on, ids })",
+        "body": "setSync",
+        "result": "sync"
+      },
+      "POST /api/space/add": {
+        "call": "add({ id })",
+        "body": "add",
+        "result": "sync"
+      },
+      "GET /api/space/feed": {
+        "call": "feed()",
+        "body": null,
+        "result": "feed"
+      },
+      "POST /api/space/items": {
+        "call": "host.space.put(items), then changed(ids)",
+        "body": "items",
+        "result": "itemsPut"
+      }
+    },
+    "empty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [],
+      "properties": {}
+    },
+    "login": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site",
+        "email",
+        "token"
+      ],
+      "properties": {
+        "site": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 320
+        },
+        "token": {
+          "type": "string",
+          "maxLength": 2000
+        }
+      }
+    },
+    "project": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project"
+      ],
+      "properties": {
+        "project": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]{1,9}$",
+          "description": "a Jira project key; case does not matter"
+        }
+      }
+    },
+    "apply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project"
+      ],
+      "properties": {
+        "project": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]{1,9}$",
+          "description": "a Jira project key; case does not matter"
+        },
+        "dryRun": {
+          "type": "boolean"
+        }
+      }
+    },
+    "create": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]{1,9}$",
+          "description": "a Jira project key; case does not matter"
+        },
+        "name": {
+          "type": "string",
+          "maxLength": 80
+        }
+      }
+    },
+    "saveRoles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "project",
+        "roles"
+      ],
+      "properties": {
+        "project": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9]{1,9}$",
+          "description": "a Jira project key; case does not matter"
+        },
+        "roles": {
+          "type": "object",
+          "maxProperties": 20,
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "people"
+            ],
+            "properties": {
+              "people": {
+                "type": "array",
+                "maxItems": 50,
+                "items": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "minLength": 1
+                }
+              },
+              "assign": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "maxLength": 128
+              }
+            }
+          }
+        }
+      }
+    },
+    "setEpic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "epic"
+      ],
+      "properties": {
+        "epic": {
+          "type": "string",
+          "maxLength": 40
+        }
+      }
+    },
+    "setSync": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "on"
+      ],
+      "properties": {
+        "on": {
+          "type": "boolean"
+        },
+        "ids": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "add": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 500,
+          "minLength": 1
+        }
+      }
+    },
+    "spaceItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "summary",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 500,
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 255,
+          "minLength": 1,
+          "x-lang": true
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 30000,
+          "description": "markdown; Jira gets ADF",
+          "x-lang": true
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 60,
+          "minLength": 1,
+          "description": "a template status the issue should be in now"
+        },
+        "notes": {
+          "type": "array",
+          "maxItems": 200,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "text"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              "text": {
+                "type": "string",
+                "maxLength": 10000,
+                "minLength": 1,
+                "x-lang": true
+              }
+            }
+          }
+        },
+        "firstAt": {
+          "type": "string",
+          "maxLength": 40,
+          "description": "when the item first appeared; an item older than the moment the sync was switched on waits until added"
+        },
+        "at": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "view": {
+          "type": "object",
+          "description": "what a host shows of the item; the feed gives it back as is"
+        }
+      },
+      "description": "an item of a space: one item — one issue"
+    },
+    "items": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "items"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 2000,
+          "items": {
+            "$ref": "#/$defs/spaceItem"
+          }
+        }
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "site",
+        "email",
+        "token",
+        "source"
+      ],
+      "properties": {
+        "site": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 320
+        },
+        "token": {
+          "type": "boolean",
+          "description": "a login with a token exists; the token itself is never given"
+        },
+        "source": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        }
+      }
+    },
+    "template": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "title",
+        "statuses",
+        "transitions",
+        "roles",
+        "categories",
+        "columns"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "version": {
+          "type": "integer"
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "about": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "statuses": {
+          "type": "array"
+        },
+        "transitions": {
+          "type": "array"
+        },
+        "roles": {
+          "type": "array"
+        },
+        "types": {
+          "type": "array"
+        },
+        "rules": {
+          "type": "array"
+        },
+        "categories": {
+          "type": "object"
+        },
+        "columns": {
+          "type": "array"
+        }
+      }
+    },
+    "overview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "site",
+        "cloudId",
+        "connected",
+        "account",
+        "canCreate",
+        "projects",
+        "template",
+        "lang"
+      ],
+      "properties": {
+        "host": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "site": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "cloudId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        },
+        "connected": {
+          "type": "boolean"
+        },
+        "account": {
+          "$ref": "#/$defs/account"
+        },
+        "canCreate": {
+          "type": "boolean"
+        },
+        "projects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "key",
+              "url"
+            ]
+          }
+        },
+        "template": {
+          "$ref": "#/$defs/template"
+        },
+        "lang": {
+          "type": "string",
+          "maxLength": 35
+        }
+      }
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "lang",
+        "missing",
+        "enum",
+        "text"
+      ],
+      "properties": {
+        "lang": {
+          "type": "string",
+          "maxLength": 35
+        },
+        "requested": {
+          "type": "string",
+          "maxLength": 35
+        },
+        "missing": {
+          "type": "boolean"
+        },
+        "enum": {
+          "type": "object"
+        },
+        "text": {
+          "type": "object"
+        }
+      }
+    },
+    "checkItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "state",
+        "title",
+        "detail",
+        "fix"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "state": {
+          "enum": [
+            "ok",
+            "warn",
+            "bad",
+            "unknown"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "detail": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "fix": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "what"
+              ],
+              "properties": {
+                "what": {
+                  "type": "string",
+                  "maxLength": 4000
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "items",
+        "plan",
+        "source",
+        "at",
+        "apply",
+        "project"
+      ],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/checkItem"
+          }
+        },
+        "plan": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "key",
+              "what",
+              "via"
+            ],
+            "properties": {
+              "key": {
+                "type": "string",
+                "maxLength": 40
+              },
+              "what": {
+                "type": "string",
+                "maxLength": 4000
+              },
+              "via": {
+                "enum": [
+                  "api",
+                  "manual",
+                  "check"
+                ]
+              }
+            }
+          }
+        },
+        "source": {
+          "const": "live"
+        },
+        "at": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "apply": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "project": {
+          "type": "object",
+          "required": [
+            "key",
+            "url"
+          ]
+        }
+      }
+    },
+    "applied": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "me",
+        "users",
+        "admin",
+        "single",
+        "roles"
+      ],
+      "properties": {
+        "me": {
+          "type": "object"
+        },
+        "users": {
+          "type": "array"
+        },
+        "admin": {
+          "type": "boolean"
+        },
+        "single": {
+          "type": "boolean"
+        },
+        "roles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "required": [
+              "key",
+              "title",
+              "people",
+              "assign",
+              "assignName"
+            ],
+            "properties": {
+              "key": {
+                "enum": [
+                  "design",
+                  "lead",
+                  "dev",
+                  "qa"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "maxLength": 200
+              },
+              "people": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "accountId",
+                    "name"
+                  ],
+                  "properties": {
+                    "accountId": {
+                      "type": "string",
+                      "maxLength": 128
+                    },
+                    "name": {
+                      "type": "string",
+                      "maxLength": 300
+                    }
+                  }
+                }
+              },
+              "assign": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "assignName": {
+                "type": "string",
+                "maxLength": 300
+              }
+            }
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "on",
+        "since",
+        "site",
+        "project",
+        "epic"
+      ],
+      "properties": {
+        "on": {
+          "type": "boolean"
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "site": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "epic": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        }
+      }
+    },
+    "epic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key"
+      ],
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "status": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 60
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "problem": {
+          "type": "string",
+          "maxLength": 4000
+        }
+      }
+    },
+    "epicSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "on",
+        "since",
+        "site",
+        "project",
+        "epic",
+        "epicInfo"
+      ],
+      "properties": {
+        "on": {
+          "type": "boolean"
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "site": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "epic": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "epicInfo": {
+          "$ref": "#/$defs/epic"
+        }
+      }
+    },
+    "sync": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "on",
+        "since",
+        "site",
+        "project",
+        "epic",
+        "linked",
+        "skipped",
+        "errors"
+      ],
+      "properties": {
+        "on": {
+          "type": "boolean"
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "site": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 200
+        },
+        "project": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "epic": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "linked": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "linkView": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "url",
+        "applied",
+        "parent",
+        "error",
+        "skip",
+        "pending"
+      ],
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 500
+        },
+        "applied": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 60
+        },
+        "parent": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "error": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 4000
+        },
+        "skip": {
+          "type": "boolean"
+        },
+        "pending": {
+          "type": "boolean"
+        }
+      }
+    },
+    "feedItem": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "summary",
+        "status",
+        "jira"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 500,
+          "minLength": 1
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 255
+        },
+        "status": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 40
+        },
+        "jira": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "#/$defs/linkView"
+            }
+          ]
+        }
+      }
+    },
+    "feed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total",
+        "items",
+        "byStatus",
+        "sync",
+        "linked"
+      ],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/feedItem"
+          }
+        },
+        "byStatus": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "sync": {
+          "$ref": "#/$defs/state"
+        },
+        "linked": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "itemsPut": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "count",
+        "ids"
+      ],
+      "properties": {
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
