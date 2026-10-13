@@ -12,15 +12,17 @@ const FEED_SETTLE_MS = 300
 
 // v — the overview (the login, the site, its projects, the template); link — the space: its Jira project and epic and
 // the sync switch ({ on, since, site, project, epic }); feed — the items with their issues; check, roles — by Jira
-// project key; epic — the epic as Jira has it ({ key, summary, status, url, ok, problem }; null — not read yet).
-const S = { v: null, link: null, feed: null, check: {}, roles: {}, epic: null }
+// project key; epic — the epic as Jira has it ({ key, summary, status, url, ok, problem }; null — not read yet); epics —
+// the epics of every level and the project's epics to pick from (null — not read yet, { error } — Jira did not answer).
+const S = { v: null, link: null, feed: null, check: {}, roles: {}, epic: null, epics: null }
 const newMk = () => ({ open: false, key: '', name: '', busy: false, error: '' })
 const newEpic = () => ({ key: '', busy: false, error: '' })
 // The wizard: step; project — the chosen Jira project; error — the last read of Jira that failed; apply — the template
 // on the Project step ({ stage: dry | running | checked | confirm | done | error, result, error }); mk — the form of a
 // new project; auto — the step follows the first one that needs an action until the person moves on; pick — items
-// that exist already and go to Jira at once when the sync goes on; login, epic — their forms.
-const W = { step: CONN, project: null, error: '', apply: null, mk: newMk(), rolesSaved: false, auto: false, pick: new Set(), syncBusy: false, syncError: '', rechecking: false, login: { site: '', email: '', token: '', busy: false, error: '' }, epic: newEpic() }
+// that exist already and go to Jira at once when the sync goes on; login, epic — their forms; groupsAll — the groups
+// without items are shown too; epicBusy — the group or item whose epic is being saved.
+const W = { step: CONN, project: null, error: '', apply: null, mk: newMk(), rolesSaved: false, auto: false, pick: new Set(), syncBusy: false, syncError: '', rechecking: false, login: { site: '', email: '', token: '', busy: false, error: '' }, epic: newEpic(), groupsAll: false, epicBusy: '' }
 // The rules of the roles into Jira with one button on the Roles step: going, how it ended.
 const R = { busy: false, result: null, error: '' }
 
@@ -324,7 +326,7 @@ function keyHtml(i) {
 }
 // An item: its summary, its id when it says something more, the status it is in, its issue.
 const idLine = (i) => (i.id !== i.summary ? `<span class="d mono">${esc(i.id)}</span>` : '')
-const itemRow = (i) => `<div class="jfr"><span class="jk">${i.jira?.key ? IC.link : IC.new}</span><span class="jt"><b>${esc(i.summary)}</b>${idLine(i)}</span><span class="jto">${pill(i.status)}${keyHtml(i)}</span></div>`
+const itemRow = (i) => `<div class="jfr"><span class="jk">${i.jira?.key ? IC.link : IC.new}</span><span class="jt"><b>${esc(i.summary)}</b>${idLine(i)}${itemEpic(i)}</span><span class="jto">${pill(i.status)}${keyHtml(i)}</span></div>`
 const feedHtml = (f) => `<div class="jfeed">${f.items.map(itemRow).join('')}</div>${f.total > f.items.length ? `<div class="hintl">${esc(t('page.sync.shown', { shown: f.items.length, total: f.total }))}</div>` : ''}`
 // An epic for the issues (the Parent field in Jira): epics are made in Jira by hand, here — its key, the service checks
 // it in Jira. Set — which one and whether Jira still has it; "Remove" — new issues go without an epic, earlier ones stay.
@@ -346,8 +348,46 @@ function epicHtml(p) {
       ${f.error ? hint('bad', IC.err, esc(f.error)) : ''}
     </div>`
 }
+// ── epics by level: the space's (above), each group's, an item's own ───────────────────────────────────────────────
+const optHtml = (value, text, on = false) => `<option value="${esc(value)}"${on ? ' selected' : ''}>${esc(text)}</option>`
+const epicName = (key) => (key ? `${key} · ${S.epics?.list?.find((e) => e.key === key)?.summary || t('page.epics.not_in_jira')}` : t('page.epics.none'))
+// A pick of an epic: "as above" (@ — the level above decides), "no epic" (''), the project's epics; a chosen key Jira
+// no longer has stays in the list, marked.
+function epicSelect(own, above, attrs, label) {
+  const cur = own === undefined ? '@' : own || ''
+  const list = S.epics?.list || []
+  const gone = own && !list.some((e) => e.key === own) ? optHtml(own, `${own} · ${t('page.epics.not_in_jira')}`, true) : ''
+  return `<span class="sel"><select ${attrs} aria-label="${esc(label)}" ${W.epicBusy ? 'disabled' : ''}>${optHtml('@', t('page.epics.inherit', { epic: epicName(above) }), cur === '@')}${optHtml('', t('page.epics.none'), cur === '')}${gone}${list.map((e) => optHtml(e.key, `${e.key} · ${e.summary}`, cur === e.key)).join('')}</select></span>`
+}
+// The epic of an item in its row: whose choice it is and its own pick (the epics are read).
+function itemEpic(i) {
+  const m = S.epics
+  if (!m?.list || !i.epic) return ''
+  const own = Object.hasOwn(m.items, i.id) ? m.items[i.id] : undefined
+  const above = i.group != null ? (m.groups.find((g) => g.id === i.group)?.epic ?? null) : m.epic
+  return `<span class="d jepi">${esc(t('page.epics.item'))} ${epicSelect(own, above, `data-flow="epic-item" data-id="${esc(i.id)}"`, t('page.epics.item_label', { item: i.summary }))}</span>`
+}
+// Each group with its epic: the groups with items first, the others on request; keys Jira no longer has — why.
+function epicGroupsHtml(p) {
+  const m = S.epics
+  if (!m) return `<div class="hintl">${SPIN} ${esc(t('page.epics.reading', { key: p.key }))}</div>`
+  if (m.error) return hint('warn', IC.err, th('page.epics.failed', { error: bare(m.error) }))
+  if (!m.groups.length) return ''
+  const busy = W.epicBusy
+  const shown = W.groupsAll ? m.groups : m.groups.filter((g) => g.items || g.own !== undefined)
+  const rest = m.groups.length - shown.length
+  const rows = shown
+    .map((g) => `<tr><td><b>${esc(g.title)}</b></td><td class="d">${esc(String(g.items))}</td><td>${busy === `g:${g.id}` ? SPIN : epicSelect(g.own, m.epic, `data-flow="epic-group" data-id="${esc(g.id)}"`, t('page.epics.group_label', { group: g.title }))}</td></tr>`)
+    .join('')
+  const toggle = rest || W.groupsAll ? `<button type="button" class="lnk" data-flow="groups-all">${esc(W.groupsAll ? t('page.epics.less') : t('page.epics.more', { count: m.groups.length }))}</button>` : ''
+  return `<div class="jlogin"><div><div class="jlbl">${esc(t('page.epics.title'))}</div><div class="hintl">${esc(t('page.epics.about'))}</div></div>
+      ${m.missing.map((x) => hint('warn', IC.err, th('page.epics.missing', { key: x.key, problem: bare(x.problem) }))).join('')}
+      ${shown.length ? `<div class="tbl-w"><table class="jmap jepics"><thead><tr><th>${esc(t('page.epics.group'))}</th><th>${esc(t('page.epics.items'))}</th><th>${esc(t('page.epics.epic'))}</th></tr></thead><tbody>${rows}</tbody></table></div>` : ''}
+      ${toggle}
+    </div>`
+}
 // Off — what happens, which items that exist already go at once; on — since when, how many issues, the items and
-// their issues. The epic — in both.
+// their issues. The epics — in both.
 function stepSync() {
   const f = S.feed
   if (!f) return `<div class="note">${esc(t('page.sync.reading'))}</div>`
@@ -359,7 +399,7 @@ function stepSync() {
     const bad = f.items.filter((i) => i.jira?.error).length
     return `<div class="okbig"><span class="ic6">${IC.jira}</span><div><h2>${esc(t('page.sync.on_title', { project: s.project }))}</h2><p>${esc(t(s.epic ? 'page.sync.on_sub_epic' : 'page.sync.on_sub', { site: s.site, since: stamp(s.since), epic: s.epic }))}</p></div></div>
       <div class="jck-row"><span class="jck ok">${esc(t('page.sync.in_jira', { count: f.linked }))}</span>${skip ? `<span class="jck unknown">${esc(t('page.sync.skipped', { count: skip }))}</span>` : ''}${bad ? `<span class="jck bad">${esc(t('page.sync.errors', { count: bad }))}</span>` : ''}</div>
-      ${p ? epicHtml(p) : ''}
+      ${p ? epicHtml(p) + epicGroupsHtml(p) : ''}
       ${f.total ? feedHtml(f) : hint('mute', IC.info, th('page.sync.empty'))}
       ${how}
       <div class="row"><button type="button" class="btn" data-flow="sync-off" ${W.syncBusy ? 'disabled' : ''}>${esc(t('page.sync.off'))}</button></div>`
@@ -375,6 +415,7 @@ function stepSync() {
   const label = n ? t('page.sync.on_add', { issues: plural(n, 'page.n.issue_acc') }) : t('page.sync.on')
   return `<div><h2>${esc(t('page.sync.title', { key: p.key }))}</h2><p>${esc(t('page.sync.about', { key: p.key, site: S.v.site }))}</p></div>
     ${epicHtml(p)}
+    ${epicGroupsHtml(p)}
     ${list}
     ${!ready ? hint('warn', IC.err, th('page.sync.not_ready', { key: p.key })) : ''}
     ${W.syncError ? hint('bad', IC.err, esc(W.syncError)) : ''}
@@ -556,7 +597,7 @@ async function createProject() {
     toast(r.applied ? t('page.mk.toast_ok', { key: r.created }) : t('page.mk.toast_part', { key: r.created, why: r.errors?.length ? r.errors.join('; ') : t('page.mk.not_applied') }))
     S.v = await api('flow')
     S.link = await api('space/link', { project: r.created })
-    S.epic = null
+    Object.assign(S, { epic: null, epics: null })
     Object.assign(W, { project: r.created, apply: { stage: r.applied ? 'done' : 'checked', result: r }, mk: newMk(), rolesSaved: false, epic: newEpic() })
     await loadCheck(r.created, true)
   } catch (e) {
@@ -601,15 +642,40 @@ const feedSoon = () => {
   clearTimeout(feedTimer)
   feedTimer = setTimeout(loadFeed, FEED_SETTLE_MS)
 }
-// The epic as Jira has it now.
+// The epic as Jira has it now, and the epics of every level.
 async function loadEpic() {
   if (!target()) return
+  loadEpics()
   try {
     S.epic = await api('space/epic')
   } catch {
     S.epic = { key: null }
   }
   draw()
+}
+async function loadEpics() {
+  try {
+    S.epics = await api('space/epics')
+  } catch (e) {
+    S.epics = { error: e.message }
+  }
+  draw()
+}
+// A group's or an item's epic: a key, '' — no epic, @ — the level above decides. With the sync on, the issues it
+// touches move at once.
+async function saveEpicOf(of, id, value, title) {
+  if (W.epicBusy) return
+  W.epicBusy = `${of}:${id}`
+  draw()
+  try {
+    await api('space/epic', { [of === 'g' ? 'group' : 'id']: id, epic: value === '@' ? '' : value, ...(value === '@' ? { inherit: true } : {}) })
+    toast(t('page.epics.saved', { what: title, epic: value === '@' ? t('page.epics.inherit_short') : epicName(value) }))
+  } catch (e) {
+    toast(e.message)
+  }
+  W.epicBusy = ''
+  await loadEpics()
+  loadFeed()
 }
 // Set the epic (the service checks it in Jira; with the sync on, issues already there go under it) or remove it ('').
 async function saveEpic(epic) {
@@ -628,13 +694,14 @@ async function saveEpic(epic) {
   }
   f.busy = false
   draw()
+  loadEpics()
   loadFeed()
 }
 // The Jira project of the space: the service keeps it; the check and the items follow it.
 async function setTarget(key) {
   Object.assign(W, { project: key, apply: null, rolesSaved: false, auto: false, epic: newEpic() })
   Object.assign(R, { result: null, error: '' })
-  S.epic = null
+  Object.assign(S, { epic: null, epics: null })
   draw()
   loadCheck(key)
   try {
@@ -674,7 +741,7 @@ async function login(route, body) {
   try {
     S.v = await api(route, body)
     Object.assign(W.login, { site: S.v.account.site || W.login.site, email: S.v.account.email || W.login.email, token: '' })
-    Object.assign(S, { check: {}, roles: {}, epic: null })
+    Object.assign(S, { check: {}, roles: {}, epic: null, epics: null })
     Object.assign(R, { result: null, error: '' })
     S.link = await api('space').catch(() => null)
     Object.assign(W, { project: S.link?.project || null, apply: null, rolesSaved: false, error: '' })
@@ -716,6 +783,10 @@ document.addEventListener('click', (e) => {
   else if (a === 'sync-add') syncAdd(el.dataset.id)
   else if (a === 'epic-save') saveEpic(W.epic.key)
   else if (a === 'epic-clear') saveEpic('')
+  else if (a === 'groups-all') {
+    W.groupsAll = !W.groupsAll
+    draw()
+  }
 })
 document.addEventListener('change', (e) => {
   const el = e.target
@@ -723,6 +794,8 @@ document.addEventListener('change', (e) => {
   if (a === 'proj') setTarget(el.value)
   else if (a === 'roleadd' && el.value) saveRole(el.dataset.role, { add: el.value })
   else if (a === 'roleassign') saveRole(el.dataset.role, { assign: el.value })
+  else if (a === 'epic-group') saveEpicOf('g', el.dataset.id, el.value, S.epics?.groups.find((g) => g.id === el.dataset.id)?.title || el.dataset.id)
+  else if (a === 'epic-item') saveEpicOf('i', el.dataset.id, el.value, S.feed?.items.find((i) => i.id === el.dataset.id)?.summary || el.dataset.id)
   else if (a === 'pick') {
     if (el.checked) W.pick.add(el.value)
     else W.pick.delete(el.value)

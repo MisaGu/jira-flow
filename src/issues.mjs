@@ -37,6 +37,23 @@ export async function readIssue(jira, key) {
   return { id: r?.id || null, key: r?.key || key, summary: f.summary || '', status: f.status?.name || null, type: f.issuetype?.name || null, level: f.issuetype?.hierarchyLevel ?? null, project: f.project?.key || null, parent: f.parent?.key || null }
 }
 
+// The epics of a project to pick from: issues of its types one level above a task (the epic type is named differently
+// on different sites), by key; at most max.
+export async function listEpics(jira, project, { max = 500 } = {}) {
+  const p = await jira.get(`/rest/api/3/project/${enc(project)}`)
+  const types = (p?.issueTypes || []).filter((t) => t.hierarchyLevel === 1).map((t) => t.id)
+  if (!types.length) return []
+  const jql = `project = "${project}" AND issuetype in (${types.join(', ')}) ORDER BY key ASC`
+  const out = []
+  let next = null
+  do {
+    const r = await jira.get(`/rest/api/3/search/jql?jql=${enc(jql)}&fields=summary,status&maxResults=100${next ? `&nextPageToken=${enc(next)}` : ''}`)
+    for (const i of r?.issues || []) out.push({ key: i.key, summary: i.fields?.summary || '', status: i.fields?.status?.name || null })
+    next = r?.isLast === false ? r.nextPageToken || null : null
+  } while (next && out.length < max)
+  return out.slice(0, max)
+}
+
 // Put an issue under a parent (or under another one).
 export const setParent = (jira, key, parent) => jira.put(`/rest/api/3/issue/${enc(key)}`, { fields: { parent: { key: parent } } })
 

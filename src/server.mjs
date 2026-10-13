@@ -32,6 +32,7 @@ export const ROUTES = {
   'GET /api/space': (flow) => flow.state(),
   'POST /api/space/link': (flow, b) => flow.setLink(b),
   'GET /api/space/epic': (flow) => flow.epic(),
+  'GET /api/space/epics': (flow) => flow.epics(),
   'POST /api/space/epic': (flow, b) => flow.setEpic(b),
   'GET /api/space/sync': (flow) => flow.sync(),
   'POST /api/space/sync': (flow, b) => flow.setSync(b),
