@@ -11,7 +11,7 @@ import { createFlow } from './engine.mjs'
 import { FlowError } from './errors.mjs'
 import { schema, validateRef } from './schema.mjs'
 
-export const PORT = 47392
+export const PORT = 47393
 const WEB = fileURLToPath(new URL('../web/', import.meta.url))
 const HEARTBEAT_MS = 25000
 const MAX_BODY = 8 * 1024 * 1024

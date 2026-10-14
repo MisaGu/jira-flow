@@ -16,7 +16,8 @@ await check('login: site and email in login.json, the token only in secrets.json
   h.account.save({ site: 'example.atlassian.net', email: 'me@example.com', token: 'tok-1' })
   assert.deepEqual(h.account.get(), { site: 'example.atlassian.net', email: 'me@example.com', token: 'tok-1', source: 'local' })
   assert.deepEqual(read('login.json'), { site: 'example.atlassian.net', email: 'me@example.com' })
-  assert.equal(fs.statSync(path.join(home, 'secrets.json')).mode & 0o777, 0o600)
+  // Windows keeps no POSIX mode: chmod sets only the read-only flag, and a writable file reads back as 0o666.
+  assert.equal(fs.statSync(path.join(home, 'secrets.json')).mode & 0o777, process.platform === 'win32' ? 0o666 : 0o600)
   h.account.forget()
   assert.equal(h.account.get(), null)
   assert.deepEqual(read('secrets.json').tokens, {})

@@ -52,7 +52,7 @@ server (`serve`), which also has a page for a person. Calls and events are a JSO
 
 ```
 npm test
-node main.mjs serve                # http://127.0.0.1:47392/ — data in ~/.jira-flow (--home DIR, JIRA_FLOW_HOME)
+node main.mjs serve                # http://127.0.0.1:47393/ — data in ~/.jira-flow (--home DIR, JIRA_FLOW_HOME)
 node main.mjs help
 node main.mjs check --project KEY --lang en --site NAME.atlassian.net --email ADDRESS --token-file PATH
 ```
@@ -114,11 +114,11 @@ host = {
 ```
 
 `localHost({ home })` keeps it all in one folder: `login.json` (site, email), `secrets.json` (tokens by site, mode
-600), `roles.json`, `space.json` (the Jira project and epics by site, the sync switch), `links.json` (item ↔ issue by
-site) and `items.json` (items a client put through `POST api/space/items`). A host of another program passes its own
-object: its login store, its project as the space, its items with `view` — what it shows of an item, which the feed
-gives back as is. A link keeps `key`, `project`, `label`, `applied`, `seen`, `parent` and `error`; the host may keep
-its own fields next to them.
+600; Windows has no modes — there the file is as private as its folder), `roles.json`, `space.json` (the Jira project
+and epics by site, the sync switch), `links.json` (item ↔ issue by site) and `items.json` (items a client put through
+`POST api/space/items`). A host of another program passes its own object: its login store, its project as the space,
+its items with `view` — what it shows of an item, which the feed gives back as is. A link keeps `key`, `project`,
+`label`, `applied`, `seen`, `parent` and `error`; the host may keep its own fields next to them.
 
 ## From code
 
