@@ -20,6 +20,6 @@ const pkg = JSON.parse(fs.readFileSync(fileURLToPath(new URL('./package.json', i
 export const VERSION = pkg.version
 // The contract of the service (contract/: calls, events and their shapes). A host compares it with the one it was
 // written for and stops with a clear error instead of breaking quietly.
-export const CONTRACT = 4
+export const CONTRACT = 5
 // The service's page: a host with its own shell serves these files itself or copies the page.
 export const WEB = new URL('./web/', import.meta.url)

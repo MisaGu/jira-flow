@@ -89,6 +89,7 @@ engine methods and HTTP routes; bodies and results are definitions of `contract/
 | `POST /api/space/add` | `add({ id })` | `add` | `sync` |
 | `GET /api/space/feed` | `feed()` | — | `feed` |
 | `POST /api/space/items` | `host.space.put(items), then changed(ids)` | `items` | `itemsPut` |
+| `POST /api/space/move` | `moveIssue({ key, from, steps, comment })` | `moveIssue` | `issueMoved` |
 
 Events — `GET api/events` (Server-Sent Events) and `emit(event, data)` of the engine; `contract/events.schema.json`:
 `jira` — `{ type: 'created', id, key, found }`, `{ type: 'moved', id, key, from, to, path }`, `{ type: 'commented', id,
@@ -134,6 +135,8 @@ await flow.setEpic({ epic: 'KEY-8', group: 'g1' })  // the epic of a group; { id
 await flow.epics()                             // the project's epics to pick from, every group with its choice
 flow.setSync({ on: true, ids: ['item-1'] })    // these existing items go at once, new ones by themselves
 flow.changed(['item-2'])                       // the host's item changed: its issue follows once the change settles
+await flow.moveIssue({ key: 'KEY-31', from: ['In Progress', 'AI Testing'], steps: ['AI Testing', 'Human Testing'], comment: '## Tests passed' })
+                                               // an issue the space did not create follows the host's decision
 flow.said(error)                               // what to show a person for an error
 
 // Or the service on its own, with its page:
@@ -165,13 +168,28 @@ An issue goes under the epic of its item: the item's own, else its group's, else
   is created without a parent, status and notes keep up, and every step reports the refusal as an `error` event until
   the epic is fixed. `epic()` says what is wrong with the epic now.
 
+## An issue the space did not create
+
+A space syncs its own items. A host may also have to move an issue it did not create — a task a person filed and works
+on — after a decision of its own about it (a test report accepted or sent back). `moveIssue({ key, from, steps, comment
+})` does it in one call:
+
+- the issue must be in the Jira project of the space and the sync of the space must be on — otherwise nothing is
+  written and the result says why (`reason`: `project`, `sync_off`);
+- its status is read first, and the steps are taken only while it stands in one of `from` — the host names the statuses
+  its decision may move an issue out of; an issue a person finished, or one still in design, is left alone
+  (`reason: status`);
+- the comment goes first, then the steps in order, each along its path in the template; steps up to the issue's own
+  status are skipped, so a repeated decision only comments (`state: kept`);
+- events — `commented` and `moved` with `id` = the issue key.
+
 ## Isolation: who guarantees what
 
 - **The service:** the token goes only into the Authorization header and the host's secret store — never into results,
   errors, events or the page; Jira is written only when a person asks (apply, a new project) or the sync of a space is
-  on; new statuses, categories and columns go only into an empty project. The server listens on 127.0.0.1, answers only
-  to its own Host (a page that rebinds its name to this machine gets nothing), takes a POST only with the header
-  `x-flow: 1` and checks every body against the contract.
+  on (its items and `moveIssue`); new statuses, categories and columns go only into an empty project. The server
+  listens on 127.0.0.1, answers only to its own Host (a page that rebinds its name to this machine gets nothing), takes
+  a POST only with the header `x-flow: 1` and checks every body against the contract.
 - **Jira:** validates every workflow update before it is applied; transition rules apply to people moving issues by
   hand as well.
 - **The host:** keeps the login and the saved roles, decides which items to sync and when, keeps the links, shows texts
