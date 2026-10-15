@@ -44,6 +44,7 @@ export const ROUTES = {
     flow.changed(ids)
     return { count: ids.length, ids }
   },
+  'POST /api/space/move': (flow, b) => flow.moveIssue(b),
 }
 
 // host — src/hosts.mjs or the caller's own; lang — the language of texts for a person; the rest goes to createFlow

@@ -251,6 +251,42 @@ await check('an item the engine cannot take: the error is in its link and an eve
   flow.close()
 })
 
+await check('an issue the space did not create: comment first, then the steps — only from the named statuses, in the project, with the sync on', async () => {
+  const { jira, host, flow, events } = spaceSetup()
+  const put = (key, status) => jira.issues.set(key, { id: `5${key.split('-')[1]}`, key, status, labels: [], summary: key, comments: [] })
+  const ask = (key, steps = ['AI Testing', 'Human Testing']) => ({ key, from: ['In Progress', 'AI Testing', 'Human Testing'], steps, comment: '## Tests passed' })
+  put('KEY-31', 'In Progress')
+  flow.setLink({ project: 'KEY' })
+  const off = await flow.moveIssue(ask('KEY-31'))
+  fits(off, 'issueMoved')
+  assert.deepEqual([off.state, off.reason, off.text], ['skipped', 'sync_off', ru('move.sync_off', { key: 'KEY-31' })])
+  host.saved.sync = { on: true, since: new Date(Date.now() + 60000).toISOString() }
+  const n = jira.calls.length
+  const r = await flow.moveIssue(ask('key-31'))
+  fits(r, 'issueMoved')
+  assert.deepEqual([r.state, r.from, r.to, r.path], ['moved', 'In Progress', 'Human Testing', ['AI Testing', 'Human Testing']])
+  const i = jira.issues.get('KEY-31')
+  assert.equal(i.status, 'Human Testing')
+  assert.equal(i.comments.length, 1)
+  assert.match(jira.calls.slice(n).find((c) => c.startsWith('POST')), /\/comment$/, 'the comment goes before the move')
+  const again = await flow.moveIssue(ask('KEY-31'))
+  assert.deepEqual([again.state, again.from, again.path], ['kept', 'Human Testing', []])
+  assert.equal(i.comments.length, 2)
+  const back = await flow.moveIssue(ask('KEY-31', ['In Progress']))
+  assert.deepEqual([back.state, back.to], ['moved', 'In Progress'])
+  put('KEY-40', 'Done')
+  const done = await flow.moveIssue(ask('KEY-40', ['In Progress']))
+  fits(done, 'issueMoved')
+  assert.deepEqual([done.state, done.reason, done.from, jira.issues.get('KEY-40').status, jira.issues.get('KEY-40').comments.length], ['skipped', 'status', 'Done', 'Done', 0])
+  const other = await flow.moveIssue(ask('OTHER-31'))
+  assert.deepEqual([other.state, other.reason], ['skipped', 'project'])
+  await assert.rejects(flow.moveIssue({ key: 'KEY', from: ['In Progress'], steps: [] }), (e) => e.code === 'INPUT' && flow.said(e) === ru('error.issue_key', { key: 'KEY' }))
+  await assert.rejects(flow.moveIssue({ key: 'KEY-31', from: ['Doing'], steps: [] }), (e) => e.code === 'INPUT' && flow.said(e) === ru('error.status', { status: 'Doing' }))
+  for (const [, d] of events) fitsEvent(d)
+  assert.ok(events.some(([, d]) => d.type === 'moved' && d.key === 'KEY-31'))
+  flow.close()
+})
+
 await check('a host without a space: the template work only; a space call — a clear error', async () => {
   const host = memHost()
   delete host.space

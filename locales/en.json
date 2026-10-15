@@ -348,6 +348,13 @@
     "page.n.transition": "{{count}} transition|{{count}} transitions",
     "page.n.new": "{{count}} new|{{count}} new",
     "page.n.drop": "{{count}} extra to remove|{{count}} extra to remove",
-    "page.n.issue_acc": "{{count}} issue|{{count}} issues"
+    "page.n.issue_acc": "{{count}} issue|{{count}} issues",
+    "error.issue_key": "A Jira issue key is a project key, a dash and a number: «{{key}}».",
+    "error.status": "«{{status}}» is not a status of the template.",
+    "move.moved": "{{key}}: {{status}} → {{to}}.",
+    "move.kept": "{{key}} is already in {{status}}.",
+    "move.sync_off": "The sync of this space is off: {{key}} is left as it is.",
+    "move.project": "{{key}} is not in the Jira project of this space ({{project}}): it is left as it is.",
+    "move.status": "{{key}} is in {{status}}: a decision moves an issue only from the statuses the host named."
   }
 }
