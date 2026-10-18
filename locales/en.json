@@ -60,6 +60,17 @@
       "parent": "parent set",
       "text": "text updated",
       "error": "error"
+    },
+    "move": {
+      "moved": "moved",
+      "kept": "kept where it was",
+      "skipped": "left alone"
+    },
+    "skip": {
+      "sync_off": "the sync is off",
+      "project": "another Jira project",
+      "own": "an issue of an item of the space",
+      "status": "a status the host did not name"
     }
   },
   "text": {
@@ -355,6 +366,7 @@
     "move.kept": "{{key}} is already in {{status}}.",
     "move.sync_off": "The sync of this space is off: {{key}} is left as it is.",
     "move.project": "{{key}} is not in the Jira project of this space ({{project}}): it is left as it is.",
-    "move.status": "{{key}} is in {{status}}: a decision moves an issue only from the statuses the host named."
+    "move.status": "{{key}} is in {{status}}: a decision moves an issue only from the statuses the host named.",
+    "move.own": "{{key}} is the issue of an item of this space: it follows its item, not a decision."
   }
 }

@@ -27,11 +27,11 @@ import { describe } from './check.mjs'
 import { boardUrl, createClient, issueUrl, siteCloudId, SITE_RE } from './client.mjs'
 import { enums } from './enums.mjs'
 import { fail, FlowError } from './errors.mjs'
-import { addComment, ISSUE_KEY_RE, listEpics, moveTo, readIssue, statusOf } from './issues.mjs'
+import { addComment, ISSUE_KEY_RE, listEpics, moveTo, pathTo, readIssue, statusOf } from './issues.mjs'
 import { checkLang, labels, textOf } from './lang.mjs'
 import { isAdmin, KEY_RE, listProjects, readPeople } from './project.mjs'
 import { createSync } from './sync.mjs'
-import { describeTemplate, loadTemplate, roleOf, rolesFor, validateTemplate } from './template.mjs'
+import { describeTemplate, loadTemplate, norm, roleOf, rolesFor, validateTemplate } from './template.mjs'
 
 const PROJECTS_TTL_MS = 30000
 const SETTLE_MS = 1500
@@ -453,10 +453,10 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
   }
 
   // An issue the space did not create — a task a person filed and works on — follows a decision of the host about it
-  // (a test report accepted or sent back): a comment first, then the given steps of the template, each along its path.
+  // (a test report accepted or sent back): the given steps of the template, each along its path, then a comment.
   // Its status is read first and the steps are taken only while it stands in one of from: an issue a person finished,
   // or one still in design, is left alone and the result says why. Jira is written only with the sync of the space on
-  // and only in its Jira project — as for the space's own items.
+  // and only in its Jira project — as for the space's own items; an issue of the space's own item follows its item.
   async function moveIssue({ key, from = [], steps = [], comment = '' } = {}) {
     spaceOnly()
     const k = String(key ?? '').trim().toUpperCase()
@@ -465,21 +465,34 @@ export function createFlow({ host, emit = () => {}, lang = 'en', template = 'des
     for (const x of [...from, ...steps]) if (!names.has(x)) throw err('INPUT', 'error.status', { status: String(x) })
     const st = state()
     const result = (state, reason, now, path = []) => ({ state, reason, key: k, from: now, to: path.at(-1) || now, path, text: text(`move.${reason || state}`, { key: k, status: now || '', project: st.project || '—', to: path.at(-1) || now || '' }) })
-    if (!st.on) return result('skipped', 'sync_off', null)
-    if (!st.project || !k.startsWith(`${st.project}-`)) return result('skipped', 'project', null)
+    if (!st.on) return result(enums.move.SKIPPED, enums.skip.SYNC_OFF, null)
+    if (!st.project || !k.startsWith(`${st.project}-`)) return result(enums.move.SKIPPED, enums.skip.PROJECT, null)
+    // Moved here, it would be moved back by the sync at the next change of its item.
+    if (Object.values(sp.links.all(st.site) || {}).some((l) => l?.key === k)) return result(enums.move.SKIPPED, enums.skip.OWN, null)
     const jira = need()
     const now = await statusOf(jira, k)
-    if (!from.includes(now)) return result('skipped', 'status', now)
-    const at = steps.indexOf(now)
+    const same = (a) => (b) => norm(a) === norm(b)
+    if (!from.some(same(now))) return result(enums.move.SKIPPED, enums.skip.STATUS, now)
+    const at = steps.findIndex(same(now))
     const rest = at >= 0 ? steps.slice(at + 1) : steps
+    // Every path is known before Jira is written: a template without one fails with the issue untouched.
+    rest.forEach((to, i) => {
+      const cur = i ? rest[i - 1] : now
+      if (!pathTo(cur, to, tpl)) throw new FlowError('NO_PATH', `the template has no path ${cur} → ${to}`)
+    })
+    // The steps go before the comment: a step Jira refuses midway leaves no comment, the steps taken are reported, and
+    // the same call again goes on from the status the issue reached and comments once.
+    const path = []
+    try {
+      for (const to of rest) path.push(...(await moveTo(jira, k, to, tpl)).path)
+    } finally {
+      if (path.length) emit('jira', { type: enums.event.MOVED, id: k, key: k, issue: true, from: now, to: path.at(-1), path })
+    }
     if (comment) {
       await addComment(jira, k, String(comment))
-      emit('jira', { type: enums.event.COMMENTED, id: k, key: k, note: 'move' })
+      emit('jira', { type: enums.event.COMMENTED, id: k, key: k, issue: true, note: 'move' })
     }
-    const path = []
-    for (const to of rest) path.push(...(await moveTo(jira, k, to, tpl)).path)
-    if (path.length) emit('jira', { type: enums.event.MOVED, id: k, key: k, from: now, to: path.at(-1), path })
-    return result(path.length ? 'moved' : 'kept', null, now, path)
+    return result(path.length ? enums.move.MOVED : enums.move.KEPT, null, now, path)
   }
 
   return {

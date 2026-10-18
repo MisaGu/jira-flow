@@ -175,13 +175,17 @@ on — after a decision of its own about it (a test report accepted or sent back
 })` does it in one call:
 
 - the issue must be in the Jira project of the space and the sync of the space must be on — otherwise nothing is
-  written and the result says why (`reason`: `project`, `sync_off`);
-- its status is read first, and the steps are taken only while it stands in one of `from` — the host names the statuses
-  its decision may move an issue out of; an issue a person finished, or one still in design, is left alone
-  (`reason: status`);
-- the comment goes first, then the steps in order, each along its path in the template; steps up to the issue's own
-  status are skipped, so a repeated decision only comments (`state: kept`);
-- events — `commented` and `moved` with `id` = the issue key.
+  written and the result says why (`reason`: `project`, `sync_off`); an issue of the space's own item follows its item,
+  not a decision (`reason: own`);
+- its status is read first, and the steps are taken only while it stands in one of `from` (names compared without
+  case and spaces) — the host names the statuses its decision may move an issue out of; an issue a person finished, or
+  one still in design, is left alone (`reason: status`);
+- every step's path in the template is checked before Jira is written (`NO_PATH`); the steps go in order, steps up to
+  the issue's own status are skipped, then the comment — a step Jira refuses midway leaves no comment, the steps taken
+  come in a `moved` event, and the same call again goes on from where the issue stands; a repeated decision only
+  comments (`state: kept`);
+- `state` and `reason` are `enums.move` and `enums.skip`; events — `moved` and `commented` with `issue: true` and
+  `id` = the issue key.
 
 ## Isolation: who guarantees what
 

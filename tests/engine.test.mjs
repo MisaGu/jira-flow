@@ -251,7 +251,7 @@ await check('an item the engine cannot take: the error is in its link and an eve
   flow.close()
 })
 
-await check('an issue the space did not create: comment first, then the steps â€” only from the named statuses, in the project, with the sync on', async () => {
+await check('an issue the space did not create: the steps, then the comment â€” only from the named statuses, in the project, with the sync on', async () => {
   const { jira, host, flow, events } = spaceSetup()
   const put = (key, status) => jira.issues.set(key, { id: `5${key.split('-')[1]}`, key, status, labels: [], summary: key, comments: [] })
   const ask = (key, steps = ['AI Testing', 'Human Testing']) => ({ key, from: ['In Progress', 'AI Testing', 'Human Testing'], steps, comment: '## Tests passed' })
@@ -268,7 +268,7 @@ await check('an issue the space did not create: comment first, then the steps â€
   const i = jira.issues.get('KEY-31')
   assert.equal(i.status, 'Human Testing')
   assert.equal(i.comments.length, 1)
-  assert.match(jira.calls.slice(n).find((c) => c.startsWith('POST')), /\/comment$/, 'the comment goes before the move')
+  assert.match(jira.calls.slice(n).filter((c) => c.startsWith('POST')).at(-1), /\/comment$/, 'the comment goes after the steps')
   const again = await flow.moveIssue(ask('KEY-31'))
   assert.deepEqual([again.state, again.from, again.path], ['kept', 'Human Testing', []])
   assert.equal(i.comments.length, 2)
@@ -280,6 +280,29 @@ await check('an issue the space did not create: comment first, then the steps â€
   assert.deepEqual([done.state, done.reason, done.from, jira.issues.get('KEY-40').status, jira.issues.get('KEY-40').comments.length], ['skipped', 'status', 'Done', 'Done', 0])
   const other = await flow.moveIssue(ask('OTHER-31'))
   assert.deepEqual([other.state, other.reason], ['skipped', 'project'])
+  // An issue of the space's own item follows its item.
+  put('KEY-50', 'In Progress')
+  host.saved.links['example.atlassian.net'] = { a: { key: 'KEY-50' } }
+  const own = await flow.moveIssue(ask('KEY-50'))
+  fits(own, 'issueMoved')
+  assert.deepEqual([own.state, own.reason, own.text, jira.issues.get('KEY-50').status], ['skipped', 'own', ru('move.own', { key: 'KEY-50' }), 'In Progress'])
+  // A status named in Jira in another case is still the template's.
+  put('KEY-60', 'in progress')
+  const low = await flow.moveIssue(ask('KEY-60', ['In Progress']))
+  assert.deepEqual([low.state, low.reason], ['kept', null])
+  // A step Jira refuses midway: no comment, the step taken is reported; the same call goes on and comments once.
+  put('KEY-70', 'In Progress')
+  const post = jira.post
+  jira.post = async (route, body) => {
+    if (String(body?.transition?.id).endsWith('Human Testing')) throw Object.assign(new Error('refused'), { code: 'JIRA' })
+    return post.call(jira, route, body)
+  }
+  await assert.rejects(flow.moveIssue(ask('KEY-70')), (e) => e.code === 'JIRA')
+  jira.post = post
+  assert.deepEqual([jira.issues.get('KEY-70').status, jira.issues.get('KEY-70').comments.length], ['AI Testing', 0])
+  assert.deepEqual(events.at(-1)[1], { type: 'moved', id: 'KEY-70', key: 'KEY-70', issue: true, from: 'In Progress', to: 'AI Testing', path: ['AI Testing'] })
+  const retry = await flow.moveIssue(ask('KEY-70'))
+  assert.deepEqual([retry.state, retry.from, retry.path, jira.issues.get('KEY-70').comments.length], ['moved', 'AI Testing', ['Human Testing'], 1])
   await assert.rejects(flow.moveIssue({ key: 'KEY', from: ['In Progress'], steps: [] }), (e) => e.code === 'INPUT' && flow.said(e) === ru('error.issue_key', { key: 'KEY' }))
   await assert.rejects(flow.moveIssue({ key: 'KEY-31', from: ['Doing'], steps: [] }), (e) => e.code === 'INPUT' && flow.said(e) === ru('error.status', { status: 'Doing' }))
   for (const [, d] of events) fitsEvent(d)

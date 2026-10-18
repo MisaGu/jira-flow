@@ -1362,7 +1362,7 @@
       }
     },
     "moveIssue": {
-      "description": "an issue the space did not create follows the host's decision: comment, then steps — only while the issue stands in one of from",
+      "description": "an issue the space did not create follows the host's decision: steps, then comment — only while the issue stands in one of from",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -1399,7 +1399,7 @@
         "comment": {
           "type": "string",
           "maxLength": 32000,
-          "description": "markdown, written before the move"
+          "description": "markdown, written after the steps"
         }
       }
     },
@@ -1428,6 +1428,7 @@
             null,
             "sync_off",
             "project",
+            "own",
             "status"
           ],
           "description": "why it was skipped"
