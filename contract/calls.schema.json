@@ -142,6 +142,11 @@
         "call": "host.space.put(items), then changed(ids)",
         "body": "items",
         "result": "itemsPut"
+      },
+      "POST /api/space/move": {
+        "call": "moveIssue({ key, from, steps, comment })",
+        "body": "moveIssue",
+        "result": "issueMoved"
       }
     },
     "empty": {
@@ -1353,6 +1358,112 @@
           "items": {
             "type": "string"
           }
+        }
+      }
+    },
+    "moveIssue": {
+      "description": "an issue the space did not create follows the host's decision: steps, then comment — only while the issue stands in one of from",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "key",
+        "from",
+        "steps"
+      ],
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 40,
+          "description": "the issue key, KEY-12"
+        },
+        "from": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "description": "statuses of the template the issue may be moved out of"
+        },
+        "steps": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "description": "statuses to go through, in order; those up to the issue's own are skipped"
+        },
+        "comment": {
+          "type": "string",
+          "maxLength": 32000,
+          "description": "markdown, written after the steps"
+        }
+      }
+    },
+    "issueMoved": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "reason",
+        "key",
+        "from",
+        "to",
+        "path",
+        "text"
+      ],
+      "properties": {
+        "state": {
+          "enum": [
+            "moved",
+            "kept",
+            "skipped"
+          ]
+        },
+        "reason": {
+          "enum": [
+            null,
+            "sync_off",
+            "project",
+            "own",
+            "status"
+          ],
+          "description": "why it was skipped"
+        },
+        "key": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "from": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 60,
+          "description": "the status the issue stood in; null — not read"
+        },
+        "to": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 60
+        },
+        "path": {
+          "type": "array",
+          "maxItems": 40,
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "text": {
+          "type": "string",
+          "maxLength": 400,
+          "description": "what happened, for a person in the service's language"
         }
       }
     }

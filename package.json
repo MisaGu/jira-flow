@@ -1,6 +1,6 @@
 {
   "name": "jira-flow",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "A service for Jira Cloud: workflow templates for team-managed projects (check, apply, a new project, roles) and issues kept in step with the host's items — an engine, its server with a page, a JSON contract",
   "private": true,
   "type": "module",

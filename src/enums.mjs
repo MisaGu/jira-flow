@@ -21,4 +21,7 @@ export const enums = Object.freeze({
   role: makeEnum('role', ['design', 'lead', 'dev', 'qa']),
   // What the sync engine reports to its host.
   event: makeEnum('event', ['created', 'moved', 'commented', 'parent', 'text', 'error']),
+  // What moveIssue did with an issue the space did not create, and why it left one alone.
+  move: makeEnum('move', ['moved', 'kept', 'skipped']),
+  skip: makeEnum('skip', ['sync_off', 'project', 'own', 'status']),
 })

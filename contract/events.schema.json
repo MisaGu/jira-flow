@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "jira-flow/events",
   "title": "Events of the service",
-  "description": "The stream GET api/events (Server-Sent Events) and emit(event, data) of the engine. Event jira — what the sync did for one item.",
+  "description": "The stream GET api/events (Server-Sent Events) and emit(event, data) of the engine. Event jira — what the sync did for one item, or (issue: true) what moveIssue did with an issue the space did not create: id is then the issue key, not an item.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -89,6 +89,10 @@
                 "type": "string",
                 "maxLength": 60
               }
+            },
+            "issue": {
+              "const": true,
+              "description": "moveIssue: id is the issue key, not an item"
             }
           }
         },
@@ -117,6 +121,10 @@
             "note": {
               "type": "string",
               "maxLength": 200
+            },
+            "issue": {
+              "const": true,
+              "description": "moveIssue: id is the issue key, not an item"
             }
           }
         },
