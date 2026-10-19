@@ -115,10 +115,11 @@ await check('the page: index.html at /, files of web/ only, anything else goes b
   const page = await get('/')
   assert.equal(page.status, 200)
   assert.match(page.type, /text\/html/)
-  for (const p of ['/../package.json', '/%2e%2e/package.json', '/nope.txt']) {
+  for (const p of ['/../package.json', '/%2e%2e/package.json', '/nope.txt', '/%', '/%E0%A4%A']) {
     const r = await get(p)
     assert.ok(r.status === 302 && r.location === '/', `${p}: ${r.status}`)
   }
+  assert.equal((await get('/')).status, 200, 'alive after a broken %-escape')
 })
 
 await s.close()
