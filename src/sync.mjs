@@ -86,7 +86,8 @@ export function createSync({ client, project, template, store, scope = '', prefi
         store.put(id, { applied })
         emit({ type: E.MOVED, id, key: link.key, from: r.from, to: r.to, path: r.path })
       }
-      if (item.parent && (link.parent ?? null) !== item.parent) {
+      // an issue of the space's former Jira project keeps its place: an epic of the new project is not its parent
+      if (item.parent && (!link.project || link.project === key) && (link.parent ?? null) !== item.parent) {
         await setParent(jira, link.key, item.parent)
         store.put(id, { parent: item.parent })
         emit({ type: E.PARENT, id, key: link.key, parent: item.parent })

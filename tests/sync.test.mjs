@@ -150,6 +150,19 @@ await check('parent later: an issue made without one gets it on the next push; a
   assert.deepEqual([i.parent, store.get('a').parent, puts(jira)], ['KEY-91', 'KEY-91', 2])
 })
 
+await check('another Jira project of the space: an issue of the former one does not get the new epic as its parent', async () => {
+  let key = 'KEY'
+  const { jira, store, sync } = setup({ project: () => key }, EPICS)
+  sync.push({ id: 'a', summary: 'S', status: 'Design', parent: 'KEY-90' })
+  await sync.idle()
+  key = 'OTHER'
+  sync.push({ id: 'a', summary: 'S', status: 'Design Review', parent: 'OTHER-9' })
+  await sync.idle()
+  const i = jira.issues.get('KEY-1')
+  assert.deepEqual([i.parent, i.status, store.get('a').parent, store.get('a').error], ['KEY-90', 'Design Review', 'KEY-90', null])
+  assert.equal(puts(jira), 0, 'no parent written across projects')
+})
+
 await check('a parent Jira refuses: the issue goes in without it, status and notes keep up, comments are not repeated', async () => {
   const { jira, store, events, sync } = setup({}, EPICS)
   sync.push({ id: 'a', summary: 'S', status: 'Design Review', parent: 'KEY-99', notes: [{ id: 'n1', text: 'one' }] })
