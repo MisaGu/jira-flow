@@ -42,7 +42,7 @@ server (`serve`), which also has a page for a person. Calls and events are a JSO
 | `src/sync.mjs` | the sync queue: one item at a time, the latest state wins, retries |
 | `src/adf.mjs` | markdown → ADF for descriptions and comments |
 | `src/enums.mjs`, `src/lang.mjs`, `src/errors.mjs` | enums with labels, locales lookup, the error type |
-| `contract/` | JSON schemas: `calls` (routes, bodies, results), `events`, and connection, template, check, item |
+| `contract/` | JSON schemas: `calls` (routes, bodies, results), `events` |
 | `locales/` | labels and texts: `en.json` (every value), `ru.json`; `page.*` — texts of the page |
 | `templates/` | bundled templates: `design-dev.json` |
 | `web/` | the page of the service |

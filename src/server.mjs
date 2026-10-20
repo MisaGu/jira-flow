@@ -112,7 +112,8 @@ export async function serve({ port = PORT, host, lang = 'en', ...opts } = {}) {
         return send(res, 400, { ok: false, error: flow.said(e), code: e.code || null })
       }
     }
-    const rel = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname)
+    // no decodeURIComponent: «/%» would throw and take the process down; the names in web/ are ASCII
+    const rel = url.pathname === '/' ? '/index.html' : url.pathname
     const file = path.resolve(WEB, `.${rel}`)
     if (!file.startsWith(WEB) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
       res.writeHead(302, { location: '/' })
